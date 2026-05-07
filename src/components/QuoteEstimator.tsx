@@ -301,7 +301,7 @@ export default function QuoteEstimator() {
             >
               <h3 className="text-2xl font-serif text-brand-slate mb-1">Almost done!</h3>
               <p className="text-sm text-gray-400 mb-8">
-                We'll send your personalised quote directly on WhatsApp.
+                We will review your request and send your personalised quote on WhatsApp within 48 hours.
               </p>
 
               <div className="flex flex-col gap-5">
@@ -350,7 +350,7 @@ export default function QuoteEstimator() {
                   className="flex items-center gap-3 h-14 px-10 bg-brand-teal text-white text-sm font-bold uppercase tracking-widest hover:bg-brand-teal/90 transition-all rounded-sm shadow-xl shadow-brand-teal/20 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <MessageCircle className="w-5 h-5 fill-current text-brand-yellow" />
-                  Get My Quote
+                  Send Quote Request
                 </button>
               </div>
             </motion.div>
