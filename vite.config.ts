@@ -9,8 +9,6 @@ export default defineConfig(({mode}) => {
     plugins: [react(), tailwindcss()],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-      'import.meta.env.VITE_SUPABASE_URL': JSON.stringify('https://eulwznleytahdddtixje.supabase.co'),
-      'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify('sb_publishable_YRh0KOWUefpA3P1QbYIubA_A_cK9AC8'),
     },
     resolve: {
       alias: {

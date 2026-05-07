@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect } from "react";
+import type { FC } from "react";
 import { motion } from "motion/react";
 import { supabase } from "../lib/supabase";
 import { FolderOpen, Star, Wrench, Loader2 } from "lucide-react";
@@ -12,7 +13,7 @@ interface StatCard {
   label: string;
   value: number;
   description: string;
-  icon: React.FC<{ className?: string }>;
+  icon: FC<{ className?: string }>;
 }
 
 export default function AnalyticsOverview() {

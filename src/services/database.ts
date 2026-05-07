@@ -126,3 +126,47 @@ export async function deleteProject(id: string): Promise<void> {
   const { error } = await supabase.from('projects').delete().eq('id', id);
   if (error) throw error;
 }
+
+// --- Testimonials CRUD ---
+
+export async function addTestimonial(t: Omit<Testimonial, 'id'>): Promise<void> {
+  const { error } = await supabase.from('testimonials').insert([{
+    client_name: t.clientName,
+    location: t.location,
+    service_rendered: t.serviceRendered,
+    quote: t.quote,
+  }]);
+  if (error) throw error;
+}
+
+export async function updateTestimonial(t: Testimonial): Promise<void> {
+  const { error } = await supabase.from('testimonials').update({
+    client_name: t.clientName,
+    location: t.location,
+    service_rendered: t.serviceRendered,
+    quote: t.quote,
+  }).eq('id', t.id);
+  if (error) throw error;
+}
+
+export async function deleteTestimonial(id: string): Promise<void> {
+  const { error } = await supabase.from('testimonials').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// --- Services CRUD ---
+
+export async function addService(s: Omit<Service, 'id'>): Promise<void> {
+  const { error } = await supabase.from('services').insert([{
+    title: s.title,
+    category: s.category,
+    short_description: s.shortDescription,
+    icon_name: s.iconName,
+  }]);
+  if (error) throw error;
+}
+
+export async function deleteService(id: string): Promise<void> {
+  const { error } = await supabase.from('services').delete().eq('id', id);
+  if (error) throw error;
+}

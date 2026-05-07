@@ -4,6 +4,7 @@
  */
 
 import { useState } from "react";
+import type { FC } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { supabase } from "../lib/supabase";
 import { Search, CheckCircle, Clock, Wrench, PackageCheck, Loader2 } from "lucide-react";
@@ -21,7 +22,7 @@ interface Job {
 interface StatusStep {
   value: JobStatus;
   label: string;
-  icon: React.FC<{ className?: string }>;
+  icon: FC<{ className?: string }>;
   description: string;
 }
 
