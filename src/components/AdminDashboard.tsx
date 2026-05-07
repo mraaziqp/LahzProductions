@@ -78,16 +78,28 @@ export default function AdminDashboard({
 
   const { getRootProps: getRootPropsAfter, getInputProps: getInputPropsAfter } = useDropzone({ onDrop: onDropAfter, accept: { 'image/*': ['.jpg','.jpeg','.png','.webp'] }, multiple: false } as any);
 
+  // Composite (single image) mode
+  const [isComposite, setIsComposite] = useState(false);
+  const onDropComposite = useCallback((acceptedFiles: File[]) => {
+    setNewProject(prev => ({ ...prev, compositeImageFile: acceptedFiles[0] }));
+  }, []);
+  const { getRootProps: getRootPropsComposite, getInputProps: getInputPropsComposite } = useDropzone({ onDrop: onDropComposite, accept: { 'image/*': ['.jpg','.jpeg','.png','.webp'] }, multiple: false } as any);
+
   const handleAddProject = async () => {
-    if (newProject.title && (newProject as any).beforeImageFile && (newProject as any).afterImageFile) {
+    const canUploadComposite = isComposite && newProject.title && (newProject as any).compositeImageFile;
+    const canUploadPair = !isComposite && newProject.title && (newProject as any).beforeImageFile && (newProject as any).afterImageFile;
+    if (canUploadComposite || canUploadPair) {
       setLoading(true);
       try {
+        const imageFile = isComposite
+          ? (newProject as any).compositeImageFile
+          : undefined;
         await uploadProject({
           title: newProject.title,
           location: newProject.location || "Cape Town",
           category: newProject.category as any,
-          beforeImage: (newProject as any).beforeImageFile,
-          afterImage: (newProject as any).afterImageFile,
+          beforeImage: isComposite ? imageFile : (newProject as any).beforeImageFile,
+          afterImage: isComposite ? imageFile : (newProject as any).afterImageFile,
         });
         setNewProject({ category: 'Cleaning' });
         onRefresh();
@@ -232,6 +244,43 @@ export default function AdminDashboard({
                   </div>
                 </div>
 
+                {/* Image mode toggle */}
+                <div className="flex items-center gap-4 mb-6">
+                  <button
+                    type="button"
+                    onClick={() => { setIsComposite(false); setNewProject(p => ({ ...p, compositeImageFile: undefined })); }}
+                    className={`h-9 px-5 text-[10px] uppercase tracking-widest font-bold transition-all rounded-sm ${ !isComposite ? 'bg-brand-teal text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                  >Separate Before / After</button>
+                  <button
+                    type="button"
+                    onClick={() => { setIsComposite(true); setNewProject(p => ({ ...p, beforeImageFile: undefined, afterImageFile: undefined })); }}
+                    className={`h-9 px-5 text-[10px] uppercase tracking-widest font-bold transition-all rounded-sm ${ isComposite ? 'bg-brand-teal text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                  >Single Composite Photo</button>
+                </div>
+
+                {isComposite ? (
+                  <div className="flex flex-col gap-4 mb-10">
+                    <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Composite Image <span className="text-gray-300 normal-case">(before &amp; after already in one photo)</span></label>
+                    <div
+                      {...getRootPropsComposite()}
+                      className={`aspect-video border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-6 cursor-pointer transition-all ${ (newProject as any).compositeImageFile ? 'border-brand-teal bg-teal-50/10' : 'border-gray-200 hover:border-brand-teal/50'}`}
+                    >
+                      <input {...getInputPropsComposite()} />
+                      {(newProject as any).compositeImageFile ? (
+                        <div className="flex flex-col items-center">
+                          <ImageIcon className="w-8 h-8 text-brand-teal mb-2" />
+                          <span className="text-[10px] uppercase font-bold text-brand-teal">Ready to upload</span>
+                          <span className="text-[8px] text-gray-400 mt-1">{(newProject as any).compositeImageFile.name}</span>
+                        </div>
+                      ) : (
+                        <>
+                          <UploadCloud className="w-8 h-8 text-gray-300 mb-2" />
+                          <span className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Drag & Drop Composite Photo</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ) : (
                 <div className="grid md:grid-cols-2 gap-8 mb-10">
                   <div className="flex flex-col gap-4">
                     <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Before Image</label>
@@ -276,6 +325,7 @@ export default function AdminDashboard({
                     </div>
                   </div>
                 </div>
+                )}
 
                 <div className="flex flex-col gap-2 mb-8">
                   <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Category</label>
@@ -291,7 +341,7 @@ export default function AdminDashboard({
 
                 <button 
                   onClick={handleAddProject}
-                  disabled={!newProject.title || !(newProject as any).beforeImageFile || !(newProject as any).afterImageFile || loading}
+                  disabled={!newProject.title || (isComposite ? !(newProject as any).compositeImageFile : (!(newProject as any).beforeImageFile || !(newProject as any).afterImageFile)) || loading}
                   className="w-full py-5 bg-brand-teal text-white uppercase tracking-[0.2em] text-xs font-bold hover:bg-brand-teal/90 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-3 shadow-xl shadow-brand-teal/20"
                 >
                   {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} 

@@ -13,20 +13,27 @@ interface BeforeAfterSliderProps {
 }
 
 export default function BeforeAfterSlider({ before, after, title, location }: BeforeAfterSliderProps) {
+  const isComposite = before === after;
   return (
     <div className="group space-y-4">
-      <div className="relative aspect-video rounded-lg overflow-hidden border border-white/10 shadow-2xl bg-brand-slate/50">
-        <ReactCompareSlider
-          itemOne={<ReactCompareSliderImage src={before} alt="Before" className="grayscale opacity-80" loading="lazy" decoding="async" />}
-          itemTwo={<ReactCompareSliderImage src={after} alt="After" loading="lazy" decoding="async" />}
-          className="h-full w-full"
-        />
-        <div className="absolute top-4 left-4 bg-brand-slate/80 backdrop-blur-md px-3 py-1 text-[10px] uppercase tracking-widest text-white font-bold border border-white/10">
-          Before
-        </div>
-        <div className="absolute top-4 right-4 bg-brand-teal/80 backdrop-blur-md px-3 py-1 text-[10px] uppercase tracking-widest text-white font-bold border border-white/10">
-          After
-        </div>
+      <div className="relative rounded-lg overflow-hidden border border-white/10 shadow-2xl bg-brand-slate/50">
+        {isComposite ? (
+          <img src={before} alt={title} loading="lazy" decoding="async" className="w-full h-auto object-cover" />
+        ) : (
+          <div className="aspect-video">
+            <ReactCompareSlider
+              itemOne={<ReactCompareSliderImage src={before} alt="Before" className="grayscale opacity-80" loading="lazy" decoding="async" />}
+              itemTwo={<ReactCompareSliderImage src={after} alt="After" loading="lazy" decoding="async" />}
+              className="h-full w-full"
+            />
+            <div className="absolute top-4 left-4 bg-brand-slate/80 backdrop-blur-md px-3 py-1 text-[10px] uppercase tracking-widest text-white font-bold border border-white/10">
+              Before
+            </div>
+            <div className="absolute top-4 right-4 bg-brand-teal/80 backdrop-blur-md px-3 py-1 text-[10px] uppercase tracking-widest text-white font-bold border border-white/10">
+              After
+            </div>
+          </div>
+        )}
       </div>
       <div className="flex justify-between items-start pt-2">
         <div>
