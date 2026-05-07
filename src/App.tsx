@@ -373,7 +373,37 @@ export default function App() {
         </div>
       </section>
 
-      {/* Gallery Section */}
+      {/* How It Works Section — always visible */}
+      <section className="py-20 md:py-28 bg-brand-slate text-white relative overflow-hidden scroll-mt-20">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center mb-16">
+            <span className="text-xs uppercase tracking-[0.5em] text-brand-teal font-extrabold mb-6 block">Simple Process</span>
+            <h2 className="text-3xl md:text-5xl font-serif leading-tight">How It Works</h2>
+          </div>
+          <div className="grid md:grid-cols-3 gap-8 md:gap-12">
+            {[
+              { step: '01', title: 'Tell Us What You Need', desc: 'Fill in the quote form or send us a WhatsApp. Describe your item, what needs doing, and where you are located.' },
+              { step: '02', title: 'We Assess & Quote', desc: 'We review every request personally. Within 48 hours we send a detailed, honest quote — no hidden costs, no pressure.' },
+              { step: '03', title: 'We Get To Work', desc: 'Once approved, our team handles everything in-house. You get real-time updates until your item is ready for collection or delivery.' },
+            ].map(({ step, title, desc }) => (
+              <motion.div
+                key={step}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                className="flex flex-col gap-4 border-t-2 border-brand-teal pt-8"
+              >
+                <span className="text-5xl font-serif text-brand-teal/30 font-bold leading-none">{step}</span>
+                <h3 className="text-lg font-bold text-white uppercase tracking-wide">{title}</h3>
+                <p className="text-sm text-white/50 leading-relaxed font-light">{desc}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Gallery Section — only shown when portfolio projects exist */}
+      {projects.length > 0 && (
       <section id="gallery" className="py-20 md:py-32 bg-brand-slate text-white relative overflow-hidden scroll-mt-20">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-16 md:mb-24">
@@ -382,7 +412,6 @@ export default function App() {
               {WEBSITE_COPY.trust.galleryHeadline}
             </h2>
           </div>
-          
           <div className="grid md:grid-cols-2 gap-10 md:gap-16">
             {projects.map((project, i) => (
               <motion.div
@@ -403,8 +432,10 @@ export default function App() {
           </div>
         </div>
       </section>
+      )}
 
-      {/* Testimonial Carousel */}
+      {/* Testimonial Carousel — only shown when testimonials exist */}
+      {testimonials.length > 0 && (
       <section id="testimonials" className="py-20 md:py-32 px-6 bg-brand-white scroll-mt-20">
         <div className="max-w-4xl mx-auto text-center">
           <span className="text-xs uppercase tracking-[0.4em] text-brand-teal font-extrabold mb-8 block font-sans">The Guild Registry</span>
@@ -443,6 +474,7 @@ export default function App() {
           </div>
         </div>
       </section>
+      )}
 
       {/* Quote Estimator Section */}
       <section id="quote" className="py-20 md:py-32 px-6 bg-white border-y border-gray-100 scroll-mt-20">
