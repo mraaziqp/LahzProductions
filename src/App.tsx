@@ -137,6 +137,8 @@ export default function App() {
   ];
 
   const whatsappUrl = `https://wa.me/${WEBSITE_COPY.contact.phone}`;
+  const contactSectionId = "contact";
+  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(WEBSITE_COPY.contact.location)}`;
 
   const filteredServices = services.filter(s => s.category === activeServiceTab);
 
@@ -158,8 +160,17 @@ export default function App() {
             <a href="#services" className="text-sm uppercase tracking-widest hover:text-brand-teal transition-all">Services</a>
             <a href="#about" className="text-sm uppercase tracking-widest hover:text-brand-teal transition-all">Why Us</a>
             <a href="#gallery" className="text-sm uppercase tracking-widest hover:text-brand-teal transition-all">Showcase</a>
-            <button className="h-11 px-6 bg-brand-teal text-white text-xs uppercase tracking-widest font-bold hover:bg-brand-teal/90 transition-all rounded-sm shadow-sm">
+            <a
+              href={`#${contactSectionId}`}
+              className="h-11 px-6 bg-brand-teal text-white text-xs uppercase tracking-widest font-bold hover:bg-brand-teal/90 transition-all rounded-sm shadow-sm flex items-center"
+            >
               Contact
+            </a>
+            <button
+              onClick={() => setShowAdmin(true)}
+              className="h-11 px-6 border border-gray-200 text-brand-slate text-xs uppercase tracking-widest font-bold hover:bg-gray-50 transition-all rounded-sm flex items-center gap-2"
+            >
+              <Lock className="w-3 h-3" /> Staff Access
             </button>
           </div>
 
@@ -179,6 +190,10 @@ export default function App() {
               <a href="#services" onClick={() => setIsMenuOpen(false)} className="text-sm uppercase tracking-widest font-bold py-2">Services</a>
               <a href="#about" onClick={() => setIsMenuOpen(false)} className="text-sm uppercase tracking-widest font-bold py-2">Why Us</a>
               <a href="#gallery" onClick={() => setIsMenuOpen(false)} className="text-sm uppercase tracking-widest font-bold py-2">Showcase</a>
+              <a href={`#${contactSectionId}`} onClick={() => setIsMenuOpen(false)} className="text-sm uppercase tracking-widest font-bold py-2">Contact</a>
+              <button onClick={() => { setIsMenuOpen(false); setShowAdmin(true); }} className="text-sm uppercase tracking-widest font-bold py-2 text-left flex items-center gap-2">
+                <Lock className="w-4 h-4" /> Staff Access
+              </button>
             </motion.div>
           )}
         </AnimatePresence>
@@ -436,15 +451,16 @@ export default function App() {
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div>
               <span className="text-xs uppercase tracking-[0.4em] text-brand-teal font-extrabold mb-6 block">
-                Instant Quote
+                Quote Request
               </span>
               <h2 className="text-4xl md:text-6xl font-serif text-brand-slate leading-tight mb-6">
-                Get a quote in <br className="hidden md:block" />
-                <span className="italic text-brand-teal">60 seconds</span>
+                Hear back within <br className="hidden md:block" />
+                <span className="italic text-brand-teal">48 hours</span>
               </h2>
               <p className="text-gray-400 text-lg leading-relaxed font-light max-w-md">
-                Tell us what you need and we'll send a personalised quote straight
-                to your WhatsApp—no calls, no waiting.
+                Tell us what you need and send through the details on WhatsApp.
+                We will review the request, assess the work involved, and send a
+                personalised quote within 48 hours.
               </p>
             </div>
             <QuoteEstimator />
@@ -471,20 +487,26 @@ export default function App() {
       </section>
 
       {/* Footer */}
-      <footer className="py-16 md:py-24 border-t border-gray-100 bg-white relative">
+      <footer id="contact" className="py-16 md:py-24 border-t border-gray-100 bg-white relative scroll-mt-20">
         <div className="max-w-7xl mx-auto px-6">
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-12 mb-20 text-center md:text-left">
             <div className="space-y-4">
               <span className="text-[10px] uppercase tracking-widest font-extrabold text-brand-teal">Location</span>
-              <p className="text-sm font-serif text-brand-slate">{WEBSITE_COPY.contact.location}</p>
+              <a href={mapsUrl} target="_blank" rel="noreferrer" className="text-sm font-serif text-brand-slate hover:text-brand-teal transition-colors">
+                {WEBSITE_COPY.contact.location}
+              </a>
             </div>
             <div className="space-y-4">
               <span className="text-[10px] uppercase tracking-widest font-extrabold text-brand-teal">Direct Line</span>
-              <p className="text-sm font-serif text-brand-slate">{WEBSITE_COPY.contact.phone}</p>
+              <a href={`tel:${WEBSITE_COPY.contact.phone}`} className="text-sm font-serif text-brand-slate hover:text-brand-teal transition-colors">
+                {WEBSITE_COPY.contact.phone}
+              </a>
             </div>
             <div className="space-y-4">
               <span className="text-[10px] uppercase tracking-widest font-extrabold text-brand-teal">Email</span>
-              <p className="text-sm font-serif text-brand-slate">{WEBSITE_COPY.contact.email}</p>
+              <a href={`mailto:${WEBSITE_COPY.contact.email}`} className="text-sm font-serif text-brand-slate hover:text-brand-teal transition-colors">
+                {WEBSITE_COPY.contact.email}
+              </a>
             </div>
             <div className="space-y-4">
               <span className="text-[10px] uppercase tracking-widest font-extrabold text-brand-teal">Trading Hours</span>
@@ -525,7 +547,7 @@ export default function App() {
           rel="noreferrer"
           className="flex-1 h-12 bg-brand-teal text-white text-[10px] uppercase tracking-[0.2em] font-extrabold flex items-center justify-center gap-2 rounded-sm active:scale-[0.98] transition-all"
         >
-          <MessageCircle className="w-4 h-4 fill-current text-brand-yellow" /> WhatsApp Quote
+          <MessageCircle className="w-4 h-4 fill-current text-brand-yellow" /> Request Quote
         </a>
         <a 
           href={`tel:${WEBSITE_COPY.contact.phone}`}
