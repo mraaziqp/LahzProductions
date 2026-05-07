@@ -402,8 +402,7 @@ export default function App() {
         </div>
       </section>
 
-      {/* Gallery Section — only shown when portfolio projects exist */}
-      {projects.length > 0 && (
+      {/* Gallery Section — always anchored so nav works; content shown when projects exist */}
       <section id="gallery" className="py-20 md:py-32 bg-brand-slate text-white relative overflow-hidden scroll-mt-20">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-16 md:mb-24">
@@ -412,27 +411,33 @@ export default function App() {
               {WEBSITE_COPY.trust.galleryHeadline}
             </h2>
           </div>
-          <div className="grid md:grid-cols-2 gap-10 md:gap-16">
-            {projects.map((project, i) => (
-              <motion.div
-                key={project.id}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-              >
-                <BeforeAfterSlider 
-                  before={project.beforeImage} 
-                  after={project.afterImage} 
-                  title={project.title}
-                  location={project.location}
-                />
-              </motion.div>
-            ))}
-          </div>
+          {projects.length > 0 ? (
+            <div className="grid md:grid-cols-2 gap-10 md:gap-16">
+              {projects.map((project, i) => (
+                <motion.div
+                  key={project.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.1 }}
+                >
+                  <BeforeAfterSlider 
+                    before={project.beforeImage} 
+                    after={project.afterImage} 
+                    title={project.title}
+                    location={project.location}
+                  />
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-16 border border-white/10 rounded-sm">
+              <p className="text-white/40 text-sm uppercase tracking-widest font-bold">Portfolio coming soon</p>
+              <p className="text-white/25 text-xs mt-2">Our before &amp; after showcase will appear here once projects are added.</p>
+            </div>
+          )}
         </div>
       </section>
-      )}
 
       {/* Testimonial Carousel — only shown when testimonials exist */}
       {testimonials.length > 0 && (
