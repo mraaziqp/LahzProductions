@@ -35,7 +35,6 @@ import BeforeAfterSlider from "./components/BeforeAfterSlider";
 import AdminDashboard from "./components/AdminDashboard";
 import AdminAuth from "./components/AdminAuth";
 import QuoteEstimator from "./components/QuoteEstimator";
-import JobTracker from "./components/JobTracker";
 import { supabase } from "./lib/supabase";
 import { fetchProjects, fetchServices, fetchTestimonials } from "./services/database";
 
@@ -465,24 +464,6 @@ export default function App() {
             </div>
             <QuoteEstimator />
           </div>
-        </div>
-      </section>
-
-      {/* Job Tracker Section */}
-      <section id="track" className="py-20 md:py-32 px-6 bg-brand-slate scroll-mt-20">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-14">
-            <span className="text-xs uppercase tracking-[0.4em] text-brand-teal font-extrabold mb-6 block">
-              Live Job Status
-            </span>
-            <h2 className="text-4xl md:text-6xl font-serif text-white leading-tight mb-4">
-              Track Your Order
-            </h2>
-            <p className="text-gray-400 text-lg font-light">
-              Enter the tracking code we sent you to see exactly where your item is.
-            </p>
-          </div>
-          <JobTracker />
         </div>
       </section>
 
