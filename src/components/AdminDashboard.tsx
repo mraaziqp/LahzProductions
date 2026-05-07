@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback } from 'react';
-import { useDropzone, DropzoneOptions } from 'react-dropzone';
+import { useDropzone } from 'react-dropzone';
 import { 
   Plus, 
   Trash2, 
@@ -20,7 +20,11 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Project, Service, Testimonial } from '../constants';
-import { uploadProject, deleteProject } from '../services/database';
+import {
+  uploadProject, deleteProject,
+  addService, updateService, deleteService,
+  addTestimonial, updateTestimonial, deleteTestimonial,
+} from '../services/database';
 import { supabase } from '../lib/supabase';
 import AnalyticsOverview from './AnalyticsOverview';
 import JobManager from './JobManager';
@@ -42,7 +46,21 @@ export default function AdminDashboard({
 }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'projects' | 'services' | 'testimonials' | 'jobs'>('overview');
   const [loading, setLoading] = useState(false);
-  
+
+  // Service form state
+  const ICON_OPTIONS = ['Sofa','Wind','Settings','Hammer','Car','Sun','ShieldCheck','Stethoscope','GlassWater'];
+  const CATEGORY_OPTIONS: Service['category'][] = ['Restoration','Manufacturing','SpecializedCare'];
+  const blankService = (): Omit<Service,'id'> => ({ title:'', category:'Restoration', shortDescription:'', iconName:'Sofa' });
+  const [newService, setNewService] = useState<Omit<Service,'id'>>(blankService());
+  const [editingService, setEditingService] = useState<Service | null>(null);
+  const [serviceLoading, setServiceLoading] = useState(false);
+
+  // Testimonial form state
+  const blankTestimonial = (): Omit<Testimonial,'id'> => ({ clientName:'', location:'', serviceRendered:'', quote:'' });
+  const [newTestimonial, setNewTestimonial] = useState<Omit<Testimonial,'id'>>(blankTestimonial());
+  const [editingTestimonial, setEditingTestimonial] = useState<Testimonial | null>(null);
+  const [testimonialLoading, setTestimonialLoading] = useState(false);
+
   // Project Form State
   const [newProject, setNewProject] = useState<Partial<Project>>({
     category: 'Cleaning',
@@ -56,21 +74,9 @@ export default function AdminDashboard({
     setNewProject(prev => ({ ...prev, afterImageFile: acceptedFiles[0] }));
   }, []);
 
-  const dropzoneOptionsBefore: DropzoneOptions = { 
-    onDrop: onDropBefore,
-    accept: { 'image/*': [] },
-    multiple: false
-  };
+  const { getRootProps: getRootPropsBefore, getInputProps: getInputPropsBefore } = useDropzone({ onDrop: onDropBefore, accept: { 'image/*': ['.jpg','.jpeg','.png','.webp'] }, multiple: false } as any);
 
-  const { getRootProps: getRootPropsBefore, getInputProps: getInputPropsBefore } = useDropzone(dropzoneOptionsBefore);
-
-  const dropzoneOptionsAfter: DropzoneOptions = { 
-    onDrop: onDropAfter,
-    accept: { 'image/*': [] },
-    multiple: false
-  };
-
-  const { getRootProps: getRootPropsAfter, getInputProps: getInputPropsAfter } = useDropzone(dropzoneOptionsAfter);
+  const { getRootProps: getRootPropsAfter, getInputProps: getInputPropsAfter } = useDropzone({ onDrop: onDropAfter, accept: { 'image/*': ['.jpg','.jpeg','.png','.webp'] }, multiple: false } as any);
 
   const handleAddProject = async () => {
     if (newProject.title && (newProject as any).beforeImageFile && (newProject as any).afterImageFile) {
@@ -319,61 +325,262 @@ export default function AdminDashboard({
           )}
 
           {activeTab === 'services' && (
-            <motion.div 
+            <motion.div
               key="services"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
               className="max-w-4xl"
             >
-              <header className="mb-12">
+              <header className="mb-10">
                 <h1 className="text-4xl font-serif text-brand-slate mb-2">Service Catalog</h1>
-                <p className="text-gray-500 text-sm">Managed via primary database. All changes reflect instantly.</p>
+                <p className="text-gray-500 text-sm">Add, edit, or remove services. Changes are live immediately.</p>
               </header>
 
-              <div className="grid gap-6">
-                {services.map((service) => (
-                  <div key={service.id} className="bg-white p-8 border border-gray-100 shadow-sm flex flex-col gap-5">
-                    <div className="flex justify-between items-start">
-                      <h3 className="text-xl font-serif text-brand-slate">{service.title}</h3>
-                      <span className="text-[10px] uppercase tracking-[0.2em] font-extrabold text-brand-teal bg-teal-50 px-3 py-1">{service.category}</span>
-                    </div>
-                    <p className="text-sm text-gray-400 leading-relaxed italic">"{service.shortDescription}"</p>
-                    <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-gray-300">
-                      Icon: <span className="text-brand-slate uppercase">{service.iconName}</span>
-                    </div>
+              {/* Add New Service */}
+              <div className="bg-white border border-gray-100 p-8 shadow-sm mb-10">
+                <h2 className="text-xs uppercase tracking-[0.3em] text-brand-teal font-bold mb-6">Add New Service</h2>
+                <div className="grid md:grid-cols-2 gap-4 mb-4">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Title</label>
+                    <input type="text" placeholder="e.g. Leather Care & Repair"
+                      value={newService.title}
+                      onChange={e => setNewService(s => ({...s, title: e.target.value}))}
+                      className="p-3 border border-gray-100 bg-gray-50 focus:bg-white focus:border-brand-teal outline-none transition-all text-sm"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Category</label>
+                    <select value={newService.category} onChange={e => setNewService(s => ({...s, category: e.target.value as Service['category']}))}
+                      className="p-3 border border-gray-100 bg-gray-50 focus:bg-white focus:border-brand-teal outline-none transition-all text-sm">
+                      {CATEGORY_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Icon</label>
+                    <select value={newService.iconName} onChange={e => setNewService(s => ({...s, iconName: e.target.value}))}
+                      className="p-3 border border-gray-100 bg-gray-50 focus:bg-white focus:border-brand-teal outline-none transition-all text-sm">
+                      {ICON_OPTIONS.map(i => <option key={i} value={i}>{i}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Short Description</label>
+                    <input type="text" placeholder="One sentence description"
+                      value={newService.shortDescription}
+                      onChange={e => setNewService(s => ({...s, shortDescription: e.target.value}))}
+                      className="p-3 border border-gray-100 bg-gray-50 focus:bg-white focus:border-brand-teal outline-none transition-all text-sm"
+                    />
+                  </div>
+                </div>
+                <button
+                  disabled={!newService.title || !newService.shortDescription || serviceLoading}
+                  onClick={async () => { setServiceLoading(true); try { await addService(newService); setNewService(blankService()); onRefresh(); } catch(e){console.error(e);} finally{setServiceLoading(false);} }}
+                  className="mt-2 h-12 px-8 bg-brand-teal text-white text-xs uppercase tracking-widest font-bold hover:bg-brand-teal/90 transition-all disabled:opacity-30 flex items-center gap-2 shadow-lg shadow-brand-teal/20"
+                >
+                  {serviceLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Add Service
+                </button>
+              </div>
+
+              {/* Services list */}
+              <div className="flex flex-col gap-4">
+                {services.map(service => (
+                  <div key={service.id} className="bg-white border border-gray-100 shadow-sm">
+                    {editingService?.id === service.id ? (
+                      <div className="p-6">
+                        <div className="grid md:grid-cols-2 gap-4 mb-4">
+                          <div className="flex flex-col gap-2">
+                            <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Title</label>
+                            <input type="text" value={editingService.title}
+                              onChange={e => setEditingService(s => s ? {...s, title: e.target.value} : s)}
+                              className="p-3 border border-gray-100 bg-gray-50 focus:bg-white focus:border-brand-teal outline-none text-sm"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Category</label>
+                            <select value={editingService.category} onChange={e => setEditingService(s => s ? {...s, category: e.target.value as Service['category']} : s)}
+                              className="p-3 border border-gray-100 bg-gray-50 focus:bg-white focus:border-brand-teal outline-none text-sm">
+                              {CATEGORY_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Icon</label>
+                            <select value={editingService.iconName} onChange={e => setEditingService(s => s ? {...s, iconName: e.target.value} : s)}
+                              className="p-3 border border-gray-100 bg-gray-50 focus:bg-white focus:border-brand-teal outline-none text-sm">
+                              {ICON_OPTIONS.map(i => <option key={i} value={i}>{i}</option>)}
+                            </select>
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Description</label>
+                            <input type="text" value={editingService.shortDescription}
+                              onChange={e => setEditingService(s => s ? {...s, shortDescription: e.target.value} : s)}
+                              className="p-3 border border-gray-100 bg-gray-50 focus:bg-white focus:border-brand-teal outline-none text-sm"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-3">
+                          <button onClick={async () => { if(!editingService) return; setServiceLoading(true); try { await updateService(editingService); setEditingService(null); onRefresh(); } catch(e){console.error(e);} finally{setServiceLoading(false);} }}
+                            className="h-10 px-6 bg-brand-teal text-white text-xs uppercase tracking-widest font-bold hover:bg-brand-teal/90 transition-all flex items-center gap-2">
+                            {serviceLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : null} Save
+                          </button>
+                          <button onClick={() => setEditingService(null)}
+                            className="h-10 px-6 border border-gray-200 text-xs uppercase tracking-widest font-bold text-gray-400 hover:border-gray-400 transition-all">
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-5 flex items-center gap-6">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-1">
+                            <h3 className="font-bold text-sm text-brand-slate">{service.title}</h3>
+                            <span className="text-[9px] uppercase tracking-wider font-extrabold text-brand-teal bg-teal-50 px-2 py-0.5">{service.category}</span>
+                          </div>
+                          <p className="text-xs text-gray-400 truncate">{service.shortDescription}</p>
+                        </div>
+                        <button onClick={() => setEditingService(service)}
+                          className="h-9 px-4 text-[10px] uppercase tracking-widest font-bold border border-gray-200 text-gray-400 hover:border-brand-teal hover:text-brand-teal transition-all flex-shrink-0">
+                          Edit
+                        </button>
+                        <button onClick={async () => { if(!confirm('Delete this service?')) return; await deleteService(service.id); onRefresh(); }}
+                          className="h-9 w-9 flex items-center justify-center text-gray-200 hover:text-red-500 border border-transparent hover:border-red-100 hover:bg-red-50 transition-all flex-shrink-0">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
-                <div className="p-10 border-2 border-dashed border-gray-200 text-center rounded-lg">
-                   <p className="text-xs uppercase tracking-widest font-bold text-gray-300">Full Service Editing Module Coming Soon</p>
-                </div>
               </div>
             </motion.div>
           )}
 
           {activeTab === 'testimonials' && (
-            <motion.div 
+            <motion.div
               key="testimonials"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
               className="max-w-4xl"
             >
-              <header className="mb-12">
-                <h1 className="text-4xl font-serif text-brand-slate mb-2">Verified Feedback</h1>
-                <p className="text-gray-500 text-sm">Directly editing public perception through client voices.</p>
+              <header className="mb-10">
+                <h1 className="text-4xl font-serif text-brand-slate mb-2">Client Reviews</h1>
+                <p className="text-gray-500 text-sm">Add, edit, or remove testimonials. Shown live on the public site.</p>
               </header>
 
-              <div className="grid gap-6">
+              {/* Add new testimonial */}
+              <div className="bg-white border border-gray-100 p-8 shadow-sm mb-10">
+                <h2 className="text-xs uppercase tracking-[0.3em] text-brand-teal font-bold mb-6">Add New Review</h2>
+                <div className="grid md:grid-cols-2 gap-4 mb-4">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Client Name</label>
+                    <input type="text" placeholder="e.g. Sarah Johnson"
+                      value={newTestimonial.clientName}
+                      onChange={e => setNewTestimonial(t => ({...t, clientName: e.target.value}))}
+                      className="p-3 border border-gray-100 bg-gray-50 focus:bg-white focus:border-brand-teal outline-none text-sm"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Location</label>
+                    <input type="text" placeholder="e.g. Sea Point, Cape Town"
+                      value={newTestimonial.location}
+                      onChange={e => setNewTestimonial(t => ({...t, location: e.target.value}))}
+                      className="p-3 border border-gray-100 bg-gray-50 focus:bg-white focus:border-brand-teal outline-none text-sm"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Service Rendered</label>
+                    <input type="text" placeholder="e.g. Deep Cleaning"
+                      value={newTestimonial.serviceRendered}
+                      onChange={e => setNewTestimonial(t => ({...t, serviceRendered: e.target.value}))}
+                      className="p-3 border border-gray-100 bg-gray-50 focus:bg-white focus:border-brand-teal outline-none text-sm"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2 md:col-span-2">
+                    <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Review Quote</label>
+                    <textarea rows={3} placeholder="The client's words..."
+                      value={newTestimonial.quote}
+                      onChange={e => setNewTestimonial(t => ({...t, quote: e.target.value}))}
+                      className="p-3 border border-gray-100 bg-gray-50 focus:bg-white focus:border-brand-teal outline-none text-sm resize-none"
+                    />
+                  </div>
+                </div>
+                <button
+                  disabled={!newTestimonial.clientName || !newTestimonial.quote || testimonialLoading}
+                  onClick={async () => { setTestimonialLoading(true); try { await addTestimonial(newTestimonial); setNewTestimonial(blankTestimonial()); onRefresh(); } catch(e){console.error(e);} finally{setTestimonialLoading(false);} }}
+                  className="mt-2 h-12 px-8 bg-brand-teal text-white text-xs uppercase tracking-widest font-bold hover:bg-brand-teal/90 transition-all disabled:opacity-30 flex items-center gap-2 shadow-lg shadow-brand-teal/20"
+                >
+                  {testimonialLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Publish Review
+                </button>
+              </div>
+
+              {/* Testimonials list */}
+              <div className="flex flex-col gap-4">
                 {testimonials.map((t) => (
-                   <div key={t.id} className="bg-white p-10 border border-gray-100 shadow-sm relative">
-                     <p className="text-lg italic text-gray-500 mb-8 font-light">"{t.quote}"</p>
-                     <div className="flex justify-between items-end border-t border-gray-50 pt-6">
-                       <div>
-                         <h5 className="font-bold text-sm text-brand-slate">{t.clientName}</h5>
-                         <p className="text-[10px] uppercase tracking-[0.2em] text-gray-400 mt-1">{t.location}</p>
-                       </div>
-                       <span className="text-[10px] uppercase font-extrabold text-brand-teal">{t.serviceRendered}</span>
-                     </div>
-                   </div>
+                  <div key={t.id} className="bg-white border border-gray-100 shadow-sm">
+                    {editingTestimonial?.id === t.id ? (
+                      <div className="p-6">
+                        <div className="grid md:grid-cols-2 gap-4 mb-4">
+                          <div className="flex flex-col gap-2">
+                            <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Client Name</label>
+                            <input type="text" value={editingTestimonial.clientName}
+                              onChange={e => setEditingTestimonial(x => x ? {...x, clientName: e.target.value} : x)}
+                              className="p-3 border border-gray-100 bg-gray-50 focus:bg-white focus:border-brand-teal outline-none text-sm"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Location</label>
+                            <input type="text" value={editingTestimonial.location}
+                              onChange={e => setEditingTestimonial(x => x ? {...x, location: e.target.value} : x)}
+                              className="p-3 border border-gray-100 bg-gray-50 focus:bg-white focus:border-brand-teal outline-none text-sm"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Service Rendered</label>
+                            <input type="text" value={editingTestimonial.serviceRendered}
+                              onChange={e => setEditingTestimonial(x => x ? {...x, serviceRendered: e.target.value} : x)}
+                              className="p-3 border border-gray-100 bg-gray-50 focus:bg-white focus:border-brand-teal outline-none text-sm"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-2 md:col-span-2">
+                            <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Quote</label>
+                            <textarea rows={3} value={editingTestimonial.quote}
+                              onChange={e => setEditingTestimonial(x => x ? {...x, quote: e.target.value} : x)}
+                              className="p-3 border border-gray-100 bg-gray-50 focus:bg-white focus:border-brand-teal outline-none text-sm resize-none"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-3">
+                          <button onClick={async () => { if(!editingTestimonial) return; setTestimonialLoading(true); try { await updateTestimonial(editingTestimonial); setEditingTestimonial(null); onRefresh(); } catch(e){console.error(e);} finally{setTestimonialLoading(false);} }}
+                            className="h-10 px-6 bg-brand-teal text-white text-xs uppercase tracking-widest font-bold hover:bg-brand-teal/90 transition-all flex items-center gap-2">
+                            {testimonialLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : null} Save
+                          </button>
+                          <button onClick={() => setEditingTestimonial(null)}
+                            className="h-10 px-6 border border-gray-200 text-xs uppercase tracking-widest font-bold text-gray-400 hover:border-gray-400 transition-all">
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-6">
+                        <p className="text-sm italic text-gray-500 mb-4 leading-relaxed">"{t.quote}"</p>
+                        <div className="flex items-end justify-between border-t border-gray-50 pt-4">
+                          <div>
+                            <h5 className="font-bold text-sm text-brand-slate">{t.clientName}</h5>
+                            <p className="text-[10px] uppercase tracking-widest text-gray-400 mt-0.5">{t.location} • <span className="text-brand-teal">{t.serviceRendered}</span></p>
+                          </div>
+                          <div className="flex gap-2">
+                            <button onClick={() => setEditingTestimonial(t)}
+                              className="h-9 px-4 text-[10px] uppercase tracking-widest font-bold border border-gray-200 text-gray-400 hover:border-brand-teal hover:text-brand-teal transition-all">
+                              Edit
+                            </button>
+                            <button onClick={async () => { if(!confirm('Delete this review?')) return; await deleteTestimonial(t.id); onRefresh(); }}
+                              className="h-9 w-9 flex items-center justify-center text-gray-200 hover:text-red-500 border border-transparent hover:border-red-100 hover:bg-red-50 transition-all">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             </motion.div>
