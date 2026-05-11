@@ -136,11 +136,33 @@ INSERT INTO jobs (tracking_code, client_name, item_description, status) VALUES
   ('JB003', 'Fatima Adams',     '6x Dining Chairs — Full Reupholster in Cream',  'In Progress'),
   ('JB004', 'James Hendricks',  'Leather 2-Seater — Re-dye & Condition',         'Scheduled');
 
--- 13. Storage Setup (Run these separately if the SQL editor doesn't support storage commands)
--- INSERT INTO storage.buckets (id, name, public) VALUES ('gallery-images', 'gallery-images', true);
+-- 13. Storage Setup
+-- IMPORTANT: Run the section below in your Supabase SQL Editor (Dashboard → SQL Editor)
 
--- Storage Policies for gallery-images bucket
--- (Public read)
--- CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING ( bucket_id = 'gallery-images' );
--- (Authenticated upload)
--- CREATE POLICY "Admin Upload" ON storage.objects FOR INSERT TO authenticated WITH CHECK ( bucket_id = 'gallery-images' );
+-- Create the storage bucket (public so images are accessible via URL)
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('gallery-images', 'gallery-images', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Allow anyone to read/view uploaded images (needed for public gallery)
+CREATE POLICY "Public read gallery images"
+ON storage.objects FOR SELECT
+USING ( bucket_id = 'gallery-images' );
+
+-- Allow authenticated admins to upload images
+CREATE POLICY "Admin upload gallery images"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK ( bucket_id = 'gallery-images' );
+
+-- Allow authenticated admins to delete images
+CREATE POLICY "Admin delete gallery images"
+ON storage.objects FOR DELETE
+TO authenticated
+USING ( bucket_id = 'gallery-images' );
+
+-- Allow authenticated admins to update images
+CREATE POLICY "Admin update gallery images"
+ON storage.objects FOR UPDATE
+TO authenticated
+USING ( bucket_id = 'gallery-images' );
