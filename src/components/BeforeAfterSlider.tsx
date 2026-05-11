@@ -18,47 +18,41 @@ export default function BeforeAfterSlider({ before, after, title, location }: Be
   return (
     <div className="group space-y-4">
       <div className="relative rounded-lg overflow-hidden border border-white/10 shadow-2xl bg-brand-slate/50 w-full">
-        {isComposite ? (
-          <img 
-            src={before} 
-            alt={title} 
-            loading="lazy" 
-            decoding="async" 
-            className="w-full h-auto object-cover block" 
-          />
-        ) : (
-          <div className="w-full pt-[56.25%] relative bg-gray-800">
-            <div className="absolute inset-0">
-              <ReactCompareSlider
-                itemOne={
-                  <ReactCompareSliderImage 
-                    src={before} 
-                    alt="Before" 
-                    className="grayscale opacity-85 hover:opacity-90 transition-opacity" 
-                    loading="lazy" 
-                    decoding="async" 
-                  />
-                }
-                itemTwo={
-                  <ReactCompareSliderImage 
-                    src={after} 
-                    alt="After" 
-                    loading="lazy" 
-                    decoding="async" 
-                  />
-                }
-                className="h-full w-full"
-                position={50}
-              />
-              <div className="absolute top-3 left-3 md:top-4 md:left-4 bg-brand-slate/90 backdrop-blur-md px-2 md:px-3 py-1 text-[9px] md:text-[10px] uppercase tracking-widest text-white font-bold border border-white/20 rounded-sm pointer-events-none">
-                Before
-              </div>
-              <div className="absolute top-3 right-3 md:top-4 md:right-4 bg-brand-teal/90 backdrop-blur-md px-2 md:px-3 py-1 text-[9px] md:text-[10px] uppercase tracking-widest text-white font-bold border border-white/20 rounded-sm pointer-events-none">
-                After
-              </div>
-            </div>
+        <div className="w-full pt-[56.25%] relative bg-gray-800">
+          <div className="absolute inset-0">
+            <ReactCompareSlider
+              itemOne={
+                <ReactCompareSliderImage 
+                  src={before} 
+                  alt={isComposite ? title : 'Before'}
+                  className={isComposite ? 'brightness-90' : 'grayscale opacity-85 hover:opacity-90 transition-opacity'} 
+                  loading="lazy" 
+                  decoding="async" 
+                />
+              }
+              itemTwo={
+                <ReactCompareSliderImage 
+                  src={after} 
+                  alt={isComposite ? title : 'After'}
+                  loading="lazy" 
+                  decoding="async" 
+                />
+              }
+              className="h-full w-full"
+              position={50}
+            />
+            {!isComposite && (
+              <>
+                <div className="absolute top-3 left-3 md:top-4 md:left-4 bg-brand-slate/90 backdrop-blur-md px-2 md:px-3 py-1 text-[9px] md:text-[10px] uppercase tracking-widest text-white font-bold border border-white/20 rounded-sm pointer-events-none">
+                  Before
+                </div>
+                <div className="absolute top-3 right-3 md:top-4 md:right-4 bg-brand-teal/90 backdrop-blur-md px-2 md:px-3 py-1 text-[9px] md:text-[10px] uppercase tracking-widest text-white font-bold border border-white/20 rounded-sm pointer-events-none">
+                  After
+                </div>
+              </>
+            )}
           </div>
-        )}
+        </div>
       </div>
       <div className="flex justify-between items-start pt-2 px-1">
         <div>
