@@ -16,3 +16,32 @@
     @apply bg-brand-white text-brand-slate font-sans antialiased;
   }
 }
+
+/* React Compare Slider Styles */
+@layer components {
+  .react-compare-slider {
+    @apply relative w-full h-full overflow-hidden bg-gray-800;
+  }
+
+  .react-compare-slider__item {
+    @apply absolute inset-0;
+  }
+
+  .react-compare-slider__item img {
+    @apply w-full h-full object-cover;
+  }
+
+  .react-compare-slider-handle {
+    @apply absolute top-0 bottom-0 w-1 bg-white cursor-col-resize shadow-lg;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .react-compare-slider-handle::before {
+    @apply absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-full;
+    content: '';
+    width: 50px;
+    height: 50px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+}

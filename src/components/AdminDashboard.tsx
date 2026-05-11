@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { 
   Plus, 
@@ -16,12 +16,15 @@ import {
   MessageSquare,
   LogOut,
   BarChart2,
-  ClipboardList
+  ClipboardList,
+  X,
+  AlertCircle,
+  CheckCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Project, Service, Testimonial } from '../constants';
 import {
-  uploadProject, deleteProject,
+  uploadProject, deleteProject, validateImageFile,
   addService, updateService, deleteService,
   addTestimonial, updateTestimonial, deleteTestimonial,
 } from '../services/database';
@@ -65,51 +68,169 @@ export default function AdminDashboard({
   const [newProject, setNewProject] = useState<Partial<Project>>({
     category: 'Cleaning',
   });
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [projectFormErrors, setProjectFormErrors] = useState<{ [key: string]: string }>({});
+  const [previewUrls, setPreviewUrls] = useState<{ [key: string]: string }>({});
 
-  const onDropBefore = useCallback((acceptedFiles: File[]) => {
-    setNewProject(prev => ({ ...prev, beforeImageFile: acceptedFiles[0] }));
+  // Image preview from File objects
+  const createImagePreview = useCallback((file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.readAsDataURL(file);
+    });
   }, []);
 
-  const onDropAfter = useCallback((acceptedFiles: File[]) => {
-    setNewProject(prev => ({ ...prev, afterImageFile: acceptedFiles[0] }));
-  }, []);
+  const onDropBefore = useCallback(async (acceptedFiles: File[], rejectedFiles: any[]) => {
+    setProjectFormErrors((prev: any) => ({ ...prev, beforeImage: '' }));
+    
+    if (rejectedFiles.length > 0) {
+      setProjectFormErrors((prev: any) => ({ ...prev, beforeImage: 'Invalid file format. Please use JPG, PNG, or WebP.' }));
+      return;
+    }
 
-  const { getRootProps: getRootPropsBefore, getInputProps: getInputPropsBefore } = useDropzone({ onDrop: onDropBefore, accept: { 'image/*': ['.jpg','.jpeg','.png','.webp'] }, multiple: false } as any);
+    const file = acceptedFiles[0];
+    if (!file) return;
 
-  const { getRootProps: getRootPropsAfter, getInputProps: getInputPropsAfter } = useDropzone({ onDrop: onDropAfter, accept: { 'image/*': ['.jpg','.jpeg','.png','.webp'] }, multiple: false } as any);
+    const validation = validateImageFile(file);
+    if (!validation.valid) {
+      setProjectFormErrors((prev: any) => ({ ...prev, beforeImage: validation.error || 'Invalid image' }));
+      return;
+    }
+
+    const preview = await createImagePreview(file);
+    setPreviewUrls((prev: any) => ({ ...prev, beforeImage: preview }));
+    setNewProject((prev: any) => ({ ...prev, beforeImageFile: file }));
+  }, [createImagePreview]);
+
+  const onDropAfter = useCallback(async (acceptedFiles: File[], rejectedFiles: any[]) => {
+    setProjectFormErrors((prev: any) => ({ ...prev, afterImage: '' }));
+    
+    if (rejectedFiles.length > 0) {
+      setProjectFormErrors((prev: any) => ({ ...prev, afterImage: 'Invalid file format. Please use JPG, PNG, or WebP.' }));
+      return;
+    }
+
+    const file = acceptedFiles[0];
+    if (!file) return;
+
+    const validation = validateImageFile(file);
+    if (!validation.valid) {
+      setProjectFormErrors((prev: any) => ({ ...prev, afterImage: validation.error || 'Invalid image' }));
+      return;
+    }
+
+    const preview = await createImagePreview(file);
+    setPreviewUrls((prev: any) => ({ ...prev, afterImage: preview }));
+    setNewProject((prev: any) => ({ ...prev, afterImageFile: file }));
+  }, [createImagePreview]);
+
+  const { getRootProps: getRootPropsBefore, getInputProps: getInputPropsBefore, isDragActive: isDragActiveBefore } = useDropzone({ 
+    onDrop: onDropBefore, 
+    accept: { 'image/*': ['.jpg','.jpeg','.png','.webp'] }, 
+    multiple: false,
+    disabled: loading 
+  } as any);
+
+  const { getRootProps: getRootPropsAfter, getInputProps: getInputPropsAfter, isDragActive: isDragActiveAfter } = useDropzone({ 
+    onDrop: onDropAfter, 
+    accept: { 'image/*': ['.jpg','.jpeg','.png','.webp'] }, 
+    multiple: false,
+    disabled: loading 
+  } as any);
 
   // Composite (single image) mode
   const [isComposite, setIsComposite] = useState(false);
-  const onDropComposite = useCallback((acceptedFiles: File[]) => {
-    setNewProject(prev => ({ ...prev, compositeImageFile: acceptedFiles[0] }));
-  }, []);
-  const { getRootProps: getRootPropsComposite, getInputProps: getInputPropsComposite } = useDropzone({ onDrop: onDropComposite, accept: { 'image/*': ['.jpg','.jpeg','.png','.webp'] }, multiple: false } as any);
+  const onDropComposite = useCallback(async (acceptedFiles: File[], rejectedFiles: any[]) => {
+    setProjectFormErrors((prev: any) => ({ ...prev, compositeImage: '' }));
+    
+    if (rejectedFiles.length > 0) {
+      setProjectFormErrors((prev: any) => ({ ...prev, compositeImage: 'Invalid file format. Please use JPG, PNG, or WebP.' }));
+      return;
+    }
+
+    const file = acceptedFiles[0];
+    if (!file) return;
+
+    const validation = validateImageFile(file);
+    if (!validation.valid) {
+      setProjectFormErrors((prev: any) => ({ ...prev, compositeImage: validation.error || 'Invalid image' }));
+      return;
+    }
+
+    const preview = await createImagePreview(file);
+    setPreviewUrls((prev: any) => ({ ...prev, compositeImage: preview }));
+    setNewProject((prev: any) => ({ ...prev, compositeImageFile: file }));
+  }, [createImagePreview]);
+
+  const { getRootProps: getRootPropsComposite, getInputProps: getInputPropsComposite, isDragActive: isDragActiveComposite } = useDropzone({ 
+    onDrop: onDropComposite, 
+    accept: { 'image/*': ['.jpg','.jpeg','.png','.webp'] }, 
+    multiple: false,
+    disabled: loading 
+  } as any);
 
   const handleAddProject = async () => {
-    const canUploadComposite = isComposite && newProject.title && (newProject as any).compositeImageFile;
-    const canUploadPair = !isComposite && newProject.title && (newProject as any).beforeImageFile && (newProject as any).afterImageFile;
-    if (canUploadComposite || canUploadPair) {
-      setLoading(true);
-      try {
-        const imageFile = isComposite
-          ? (newProject as any).compositeImageFile
-          : undefined;
-        await uploadProject({
-          title: newProject.title,
-          location: newProject.location || "Cape Town",
-          category: newProject.category as any,
-          beforeImage: isComposite ? imageFile : (newProject as any).beforeImageFile,
-          afterImage: isComposite ? imageFile : (newProject as any).afterImageFile,
-        });
-        setNewProject({ category: 'Cleaning' });
-        onRefresh();
-      } catch (err) {
-        console.error(err);
-        alert('Failed to upload project');
-      } finally {
-        setLoading(false);
+    // Clear previous errors
+    setUploadError(null);
+    setProjectFormErrors({});
+
+    // Validate form
+    const errors: { [key: string]: string } = {};
+
+    if (!newProject.title || !newProject.title.trim()) {
+      errors.title = 'Project title is required';
+    }
+
+    if (isComposite) {
+      if (!(newProject as any).compositeImageFile) {
+        errors.compositeImage = 'Please upload a composite image';
+      }
+    } else {
+      if (!(newProject as any).beforeImageFile) {
+        errors.beforeImage = 'Please upload a before image';
+      }
+      if (!(newProject as any).afterImageFile) {
+        errors.afterImage = 'Please upload an after image';
       }
     }
+
+    if (Object.keys(errors).length > 0) {
+      setProjectFormErrors(errors);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const imageFile = isComposite
+        ? (newProject as any).compositeImageFile
+        : undefined;
+      
+      await uploadProject({
+        title: newProject.title,
+        location: newProject.location || "Not specified",
+        category: newProject.category as any,
+        beforeImage: isComposite ? imageFile : (newProject as any).beforeImageFile,
+        afterImage: isComposite ? imageFile : (newProject as any).afterImageFile,
+      });
+      
+      // Reset form on success
+      setNewProject({ category: 'Cleaning' });
+      setPreviewUrls({});
+      onRefresh();
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to upload project';
+      setUploadError(errorMessage);
+      console.error('Upload error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleClearImages = () => {
+    setNewProject((prev: any) => ({ ...prev, beforeImageFile: undefined, afterImageFile: undefined, compositeImageFile: undefined }));
+    setPreviewUrls({});
+    setProjectFormErrors({});
   };
 
   const handleDelete = async (id: string) => {
@@ -248,37 +369,81 @@ export default function AdminDashboard({
                 <div className="flex items-center gap-4 mb-6">
                   <button
                     type="button"
-                    onClick={() => { setIsComposite(false); setNewProject(p => ({ ...p, compositeImageFile: undefined })); }}
+                    onClick={() => { setIsComposite(false); setPreviewUrls(p => ({ ...p, beforeImage: '', afterImage: '' })); setNewProject(p => ({ ...p, compositeImageFile: undefined })); setProjectFormErrors({}); }}
                     className={`h-9 px-5 text-[10px] uppercase tracking-widest font-bold transition-all rounded-sm ${ !isComposite ? 'bg-brand-teal text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
                   >Separate Before / After</button>
                   <button
                     type="button"
-                    onClick={() => { setIsComposite(true); setNewProject(p => ({ ...p, beforeImageFile: undefined, afterImageFile: undefined })); }}
+                    onClick={() => { setIsComposite(true); setPreviewUrls(p => ({ ...p, compositeImage: '' })); setNewProject(p => ({ ...p, beforeImageFile: undefined, afterImageFile: undefined })); setProjectFormErrors({}); }}
                     className={`h-9 px-5 text-[10px] uppercase tracking-widest font-bold transition-all rounded-sm ${ isComposite ? 'bg-brand-teal text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
                   >Single Composite Photo</button>
                 </div>
+
+                {/* Error Messages */}
+                {uploadError && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3"
+                  >
+                    <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-red-900">Upload Failed</p>
+                      <p className="text-[13px] text-red-700 mt-1">{uploadError}</p>
+                    </div>
+                    <button 
+                      onClick={() => setUploadError(null)}
+                      className="text-red-400 hover:text-red-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </motion.div>
+                )}
+
+                {projectFormErrors.title && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700 flex items-center gap-2"
+                  >
+                    <AlertCircle className="w-4 h-4" /> {projectFormErrors.title}
+                  </motion.div>
+                )}
 
                 {isComposite ? (
                   <div className="flex flex-col gap-4 mb-10">
                     <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Composite Image <span className="text-gray-300 normal-case">(before &amp; after already in one photo)</span></label>
                     <div
                       {...getRootPropsComposite()}
-                      className={`aspect-video border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-6 cursor-pointer transition-all ${ (newProject as any).compositeImageFile ? 'border-brand-teal bg-teal-50/10' : 'border-gray-200 hover:border-brand-teal/50'}`}
+                      className={`aspect-video border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-6 cursor-pointer transition-all ${isDragActiveComposite ? 'border-brand-teal bg-brand-teal/5' : (previewUrls.compositeImage ? 'border-brand-teal bg-teal-50/10' : 'border-gray-200 hover:border-brand-teal/50')}`}
                     >
-                      <input {...getInputPropsComposite()} />
-                      {(newProject as any).compositeImageFile ? (
-                        <div className="flex flex-col items-center">
-                          <ImageIcon className="w-8 h-8 text-brand-teal mb-2" />
-                          <span className="text-[10px] uppercase font-bold text-brand-teal">Ready to upload</span>
-                          <span className="text-[8px] text-gray-400 mt-1">{(newProject as any).compositeImageFile.name}</span>
+                      <input {...getInputPropsComposite()} disabled={loading} />
+                      {previewUrls.compositeImage ? (
+                        <div className="flex flex-col items-center w-full h-full">
+                          <img src={previewUrls.compositeImage} alt="Preview" className="max-h-full max-w-full object-contain rounded" />
+                          <div className="mt-2 text-center">
+                            <span className="text-[10px] uppercase font-bold text-brand-teal">✓ Image Ready</span>
+                            <span className="text-[8px] text-gray-500 block mt-1">{(newProject as any).compositeImageFile?.name}</span>
+                          </div>
                         </div>
                       ) : (
                         <>
-                          <UploadCloud className="w-8 h-8 text-gray-300 mb-2" />
-                          <span className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Drag & Drop Composite Photo</span>
+                          <UploadCloud className="w-12 h-12 text-gray-300 mb-3" />
+                          <span className="text-[10px] uppercase tracking-widest font-bold text-gray-400 mb-1">Drag & Drop Your Photo</span>
+                          <span className="text-[8px] text-gray-300">or click to browse</span>
+                          <span className="text-[8px] text-gray-400 mt-2">JPG, PNG, or WebP • Max 50MB</span>
                         </>
                       )}
                     </div>
+                    {projectFormErrors.compositeImage && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700 flex items-center gap-2"
+                      >
+                        <AlertCircle className="w-4 h-4" /> {projectFormErrors.compositeImage}
+                      </motion.div>
+                    )}
                   </div>
                 ) : (
                 <div className="grid md:grid-cols-2 gap-8 mb-10">
@@ -286,48 +451,72 @@ export default function AdminDashboard({
                     <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Before Image</label>
                     <div 
                       {...getRootPropsBefore()} 
-                      className={`aspect-video border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-6 cursor-pointer transition-all ${(newProject as any).beforeImageFile ? 'border-brand-teal bg-teal-50/10' : 'border-gray-200 hover:border-brand-teal/50'}`}
+                      className={`aspect-video border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-6 cursor-pointer transition-all ${isDragActiveBefore ? 'border-brand-teal bg-brand-teal/5' : (previewUrls.beforeImage ? 'border-brand-teal bg-teal-50/10' : 'border-gray-200 hover:border-brand-teal/50')}`}
                     >
-                      <input {...getInputPropsBefore()} />
-                      {(newProject as any).beforeImageFile ? (
-                        <div className="flex flex-col items-center">
-                          <ImageIcon className="w-8 h-8 text-brand-teal mb-2" />
-                          <span className="text-[10px] uppercase font-bold text-brand-teal">Ready to upload</span>
-                          <span className="text-[8px] text-gray-400 mt-1">{(newProject as any).beforeImageFile.name}</span>
+                      <input {...getInputPropsBefore()} disabled={loading} />
+                      {previewUrls.beforeImage ? (
+                        <div className="flex flex-col items-center w-full h-full">
+                          <img src={previewUrls.beforeImage} alt="Before Preview" className="max-h-full max-w-full object-contain rounded" />
+                          <div className="mt-2 text-center">
+                            <span className="text-[10px] uppercase font-bold text-brand-teal">✓ Ready</span>
+                            <span className="text-[8px] text-gray-500 block mt-1">{(newProject as any).beforeImageFile?.name}</span>
+                          </div>
                         </div>
                       ) : (
                         <>
-                          <UploadCloud className="w-8 h-8 text-gray-300 mb-2" />
-                          <span className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Drag & Drop Before</span>
+                          <UploadCloud className="w-12 h-12 text-gray-300 mb-3" />
+                          <span className="text-[10px] uppercase tracking-widest font-bold text-gray-400 mb-1">Before Photo</span>
+                          <span className="text-[8px] text-gray-300">Drag & Drop or click to browse</span>
                         </>
                       )}
                     </div>
+                    {projectFormErrors.beforeImage && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700 flex items-center gap-2"
+                      >
+                        <AlertCircle className="w-4 h-4" /> {projectFormErrors.beforeImage}
+                      </motion.div>
+                    )}
                   </div>
                   <div className="flex flex-col gap-4">
                     <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">After Image</label>
                     <div 
                       {...getRootPropsAfter()} 
-                      className={`aspect-video border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-6 cursor-pointer transition-all ${(newProject as any).afterImageFile ? 'border-brand-teal bg-teal-50/10' : 'border-gray-200 hover:border-brand-teal/50'}`}
+                      className={`aspect-video border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-6 cursor-pointer transition-all ${isDragActiveAfter ? 'border-brand-teal bg-brand-teal/5' : (previewUrls.afterImage ? 'border-brand-teal bg-teal-50/10' : 'border-gray-200 hover:border-brand-teal/50')}`}
                     >
-                      <input {...getInputPropsAfter()} />
-                      {(newProject as any).afterImageFile ? (
-                        <div className="flex flex-col items-center">
-                          <ImageIcon className="w-8 h-8 text-brand-teal mb-2" />
-                          <span className="text-[10px] uppercase font-bold text-brand-teal">Ready to upload</span>
-                          <span className="text-[8px] text-gray-400 mt-1">{(newProject as any).afterImageFile.name}</span>
+                      <input {...getInputPropsAfter()} disabled={loading} />
+                      {previewUrls.afterImage ? (
+                        <div className="flex flex-col items-center w-full h-full">
+                          <img src={previewUrls.afterImage} alt="After Preview" className="max-h-full max-w-full object-contain rounded" />
+                          <div className="mt-2 text-center">
+                            <span className="text-[10px] uppercase font-bold text-brand-teal">✓ Ready</span>
+                            <span className="text-[8px] text-gray-500 block mt-1">{(newProject as any).afterImageFile?.name}</span>
+                          </div>
                         </div>
                       ) : (
                         <>
-                          <UploadCloud className="w-8 h-8 text-gray-300 mb-2" />
-                          <span className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Drag & Drop After</span>
+                          <UploadCloud className="w-12 h-12 text-gray-300 mb-3" />
+                          <span className="text-[10px] uppercase tracking-widest font-bold text-gray-400 mb-1">After Photo</span>
+                          <span className="text-[8px] text-gray-300">Drag & Drop or click to browse</span>
                         </>
                       )}
                     </div>
+                    {projectFormErrors.afterImage && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700 flex items-center gap-2"
+                      >
+                        <AlertCircle className="w-4 h-4" /> {projectFormErrors.afterImage}
+                      </motion.div>
+                    )}
                   </div>
                 </div>
                 )}
 
-                <div className="flex flex-col gap-2 mb-8">
+                <div className="flex flex-col gap-4 mb-10">
                   <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Category</label>
                   <select 
                     value={newProject.category}
@@ -339,14 +528,23 @@ export default function AdminDashboard({
                   </select>
                 </div>
 
-                <button 
-                  onClick={handleAddProject}
-                  disabled={!newProject.title || (isComposite ? !(newProject as any).compositeImageFile : (!(newProject as any).beforeImageFile || !(newProject as any).afterImageFile)) || loading}
-                  className="w-full py-5 bg-brand-teal text-white uppercase tracking-[0.2em] text-xs font-bold hover:bg-brand-teal/90 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-3 shadow-xl shadow-brand-teal/20"
-                >
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} 
-                  {loading ? 'Processing Uploads...' : 'Publish to Live Gallery'}
-                </button>
+                <div className="flex gap-3 mb-8">
+                  <button 
+                    onClick={handleAddProject}
+                    disabled={!newProject.title || (isComposite ? !(newProject as any).compositeImageFile : (!(newProject as any).beforeImageFile || !(newProject as any).afterImageFile)) || loading}
+                    className="flex-1 py-5 bg-brand-teal text-white uppercase tracking-[0.2em] text-xs font-bold hover:bg-brand-teal/90 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-3 shadow-xl shadow-brand-teal/20"
+                  >
+                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} 
+                    {loading ? 'Uploading...' : 'Publish to Gallery'}
+                  </button>
+                  <button 
+                    onClick={handleClearImages}
+                    disabled={!((newProject as any).beforeImageFile || (newProject as any).afterImageFile || (newProject as any).compositeImageFile) || loading}
+                    className="px-6 py-5 bg-gray-100 text-gray-600 uppercase tracking-[0.1em] text-xs font-bold hover:bg-gray-200 transition-all disabled:opacity-20 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    <X className="w-4 h-4" /> Clear
+                  </button>
+                </div>
               </div>
 
               {/* List Projects */}
