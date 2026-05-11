@@ -63,17 +63,54 @@ export async function fetchTestimonials(): Promise<Testimonial[]> {
 
 // --- Uploading/Mutating Data ---
 
+// Constants for validation
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+const ALLOWED_FORMATS = ['image/jpeg', 'image/png', 'image/webp'];
+
+/**
+ * Validates that a file meets image upload requirements
+ */
+export function validateImageFile(file: File): { valid: boolean; error?: string } {
+  if (!file) {
+    return { valid: false, error: 'No file selected' };
+  }
+
+  if (file.size > MAX_FILE_SIZE) {
+    return { valid: false, error: `File is too large. Maximum size is ${MAX_FILE_SIZE / 1024 / 1024}MB` };
+  }
+
+  if (!ALLOWED_FORMATS.includes(file.type)) {
+    return { valid: false, error: 'Invalid format. Please use JPG, PNG, or WebP' };
+  }
+
+  return { valid: true };
+}
+
 async function uploadImage(file: string | File, path: string): Promise<string> {
   // If it's already a URL, return it
   if (typeof file === 'string' && file.startsWith('http')) return file;
+
+  // Validate file if it's a File object
+  if (file instanceof File) {
+    const validation = validateImageFile(file);
+    if (!validation.valid) {
+      throw new Error(validation.error || 'Image validation failed');
+    }
+  }
 
   // Convert base64/dataURL to blob if necessary
   let blob: Blob;
   if (typeof file === 'string') {
     const response = await fetch(file);
+    if (!response.ok) throw new Error('Failed to fetch image data');
     blob = await response.blob();
   } else {
     blob = file;
+  }
+
+  // Verify blob size
+  if (blob.size > MAX_FILE_SIZE) {
+    throw new Error(`Image is too large. Maximum size is ${MAX_FILE_SIZE / 1024 / 1024}MB`);
   }
 
   const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
@@ -83,7 +120,9 @@ async function uploadImage(file: string | File, path: string): Promise<string> {
     .from('gallery-images')
     .upload(fullPath, blob);
 
-  if (uploadError) throw uploadError;
+  if (uploadError) {
+    throw new Error(`Upload failed: ${uploadError.message}`);
+  }
 
   const { data } = supabase.storage
     .from('gallery-images')
@@ -93,20 +132,47 @@ async function uploadImage(file: string | File, path: string): Promise<string> {
 }
 
 export async function uploadProject(projectData: Partial<Project>): Promise<void> {
-  const beforeUrl = await uploadImage(projectData.beforeImage!, 'before');
-  const afterUrl = await uploadImage(projectData.afterImage!, 'after');
+  // Validate before and after images exist
+  if (!projectData.beforeImage || !projectData.afterImage) {
+    throw new Error('Both before and after images are required');
+  }
+
+  if (!projectData.title || !projectData.title.trim()) {
+    throw new Error('Project title is required');
+  }
+
+  if (!projectData.category) {
+    throw new Error('Project category is required');
+  }
+
+  let beforeUrl: string;
+  let afterUrl: string;
+
+  try {
+    beforeUrl = await uploadImage(projectData.beforeImage, 'before');
+  } catch (error) {
+    throw new Error(`Failed to upload before image: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+
+  try {
+    afterUrl = await uploadImage(projectData.afterImage, 'after');
+  } catch (error) {
+    throw new Error(`Failed to upload after image: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 
   const { error } = await supabase
     .from('projects')
     .insert([{
-      title: projectData.title,
-      location: projectData.location,
+      title: projectData.title.trim(),
+      location: projectData.location || 'Not specified',
       category: projectData.category,
       before_image_url: beforeUrl,
       after_image_url: afterUrl,
     }]);
 
-  if (error) throw error;
+  if (error) {
+    throw new Error(`Failed to save project: ${error.message}`);
+  }
 }
 
 export async function updateService(service: Service): Promise<void> {
