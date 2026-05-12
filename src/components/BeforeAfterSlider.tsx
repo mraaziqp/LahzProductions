@@ -20,27 +20,37 @@ export default function BeforeAfterSlider({ before, after, title, location }: Be
       <div className="relative rounded-lg overflow-hidden border border-white/10 shadow-2xl bg-brand-slate/50 w-full">
         <div className="w-full pt-[56.25%] relative bg-gray-800">
           <div className="absolute inset-0">
-            <ReactCompareSlider
-              itemOne={
-                <ReactCompareSliderImage 
-                  src={before} 
-                  alt={isComposite ? title : 'Before'}
-                  className={isComposite ? 'brightness-90' : 'grayscale opacity-85 hover:opacity-90 transition-opacity'} 
-                  loading="lazy" 
-                  decoding="async" 
-                />
-              }
-              itemTwo={
-                <ReactCompareSliderImage 
-                  src={after} 
-                  alt={isComposite ? title : 'After'}
-                  loading="lazy" 
-                  decoding="async" 
-                />
-              }
-              className="h-full w-full"
-              position={50}
-            />
+            {isComposite ? (
+              <img
+                src={before}
+                alt={title}
+                loading="lazy"
+                decoding="async"
+                className="h-full w-full object-cover border-2 border-brand-yellow/40"
+              />
+            ) : (
+              <ReactCompareSlider
+                itemOne={
+                  <ReactCompareSliderImage 
+                    src={before} 
+                    alt="Before"
+                    className="grayscale opacity-85 hover:opacity-90 transition-opacity" 
+                    loading="lazy" 
+                    decoding="async" 
+                  />
+                }
+                itemTwo={
+                  <ReactCompareSliderImage 
+                    src={after} 
+                    alt="After"
+                    loading="lazy" 
+                    decoding="async" 
+                  />
+                }
+                className="h-full w-full"
+                position={50}
+              />
+            )}
             {!isComposite && (
               <>
                 <div className="absolute top-3 left-3 md:top-4 md:left-4 bg-brand-slate/90 backdrop-blur-md px-2 md:px-3 py-1 text-[9px] md:text-[10px] uppercase tracking-widest text-white font-bold border border-white/20 rounded-sm pointer-events-none">
