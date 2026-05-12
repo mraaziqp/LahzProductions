@@ -17,7 +17,7 @@ export default function BeforeAfterSlider({ before, after, title, location }: Be
   
   return (
     <div className="group space-y-4">
-      <div className={`relative rounded-lg overflow-hidden shadow-2xl bg-brand-slate/50 w-full ${isComposite ? 'border-2 border-brand-yellow/40 ring-2 ring-brand-teal/30 shadow-brand-yellow/10' : 'border border-white/10'}`}>
+      <div className={`relative rounded-lg overflow-hidden shadow-2xl bg-brand-slate/50 w-full transition-all duration-300 ${isComposite ? 'border-3 border-brand-yellow/70 ring-2 ring-brand-yellow/40 shadow-2xl shadow-brand-yellow/20 group-hover:border-brand-yellow group-hover:ring-4 group-hover:ring-brand-yellow/60 group-hover:shadow-brand-yellow/40' : 'border border-white/10 group-hover:border-white/20'}`}>
         <div className="w-full pt-[56.25%] relative bg-gray-800">
           <div className="absolute inset-0">
             {isComposite ? (
@@ -26,7 +26,7 @@ export default function BeforeAfterSlider({ before, after, title, location }: Be
                 alt={title}
                 loading="lazy"
                 decoding="async"
-                className="h-full w-full object-cover border-2 border-brand-yellow/60 ring-4 ring-brand-teal/20 shadow-lg"
+                className="h-full w-full object-cover"
               />
             ) : (
               <ReactCompareSlider
@@ -51,6 +51,11 @@ export default function BeforeAfterSlider({ before, after, title, location }: Be
                 position={50}
               />
             )}
+            {isComposite && (
+              <div className="absolute top-3 right-3 md:top-4 md:right-4 bg-brand-yellow/95 backdrop-blur-md px-3 md:px-4 py-1.5 text-[9px] md:text-[10px] uppercase tracking-widest text-brand-slate font-black border-2 border-brand-yellow rounded-sm pointer-events-none shadow-lg shadow-brand-yellow/40">
+                Featured Photo
+              </div>
+            )}
             {!isComposite && (
               <>
                 <div className="absolute top-3 left-3 md:top-4 md:left-4 bg-brand-slate/90 backdrop-blur-md px-2 md:px-3 py-1 text-[9px] md:text-[10px] uppercase tracking-widest text-white font-bold border border-white/20 rounded-sm pointer-events-none">
@@ -66,8 +71,8 @@ export default function BeforeAfterSlider({ before, after, title, location }: Be
       </div>
       <div className="flex justify-between items-start pt-2 px-1">
         <div>
-          <h4 className="font-serif text-lg md:text-xl text-white group-hover:text-brand-teal transition-colors truncate">{title}</h4>
-          <p className="text-[9px] md:text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold mt-1 truncate">{location}</p>
+          <h4 className={`font-serif text-lg md:text-xl transition-all duration-300 truncate ${isComposite ? 'text-brand-yellow font-black group-hover:text-white tracking-wider' : 'text-white group-hover:text-brand-teal'}`}>{title}</h4>
+          <p className={`uppercase tracking-[0.2em] font-bold mt-1 truncate transition-colors duration-300 ${isComposite ? 'text-[10px] md:text-[11px] text-brand-yellow/70 group-hover:text-brand-yellow' : 'text-[9px] md:text-[10px] text-white/40'}`}>{location}</p>
         </div>
       </div>
     </div>
