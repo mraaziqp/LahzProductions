@@ -17,7 +17,7 @@ export default function BeforeAfterSlider({ before, after, title, location }: Be
   
   return (
     <div className="group space-y-4">
-      <div className="relative rounded-lg overflow-hidden border border-white/10 shadow-2xl bg-brand-slate/50 w-full">
+      <div className={`relative rounded-lg overflow-hidden shadow-2xl bg-brand-slate/50 w-full ${isComposite ? 'border-2 border-brand-yellow/40 ring-2 ring-brand-teal/30 shadow-brand-yellow/10' : 'border border-white/10'}`}>
         <div className="w-full pt-[56.25%] relative bg-gray-800">
           <div className="absolute inset-0">
             {isComposite ? (
@@ -26,7 +26,7 @@ export default function BeforeAfterSlider({ before, after, title, location }: Be
                 alt={title}
                 loading="lazy"
                 decoding="async"
-                className="h-full w-full object-cover border-2 border-brand-yellow/40"
+                className="h-full w-full object-cover border-2 border-brand-yellow/60 ring-4 ring-brand-teal/20 shadow-lg"
               />
             ) : (
               <ReactCompareSlider

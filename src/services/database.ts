@@ -148,16 +148,30 @@ export async function uploadProject(projectData: Partial<Project>): Promise<void
   let beforeUrl: string;
   let afterUrl: string;
 
-  try {
-    beforeUrl = await uploadImage(projectData.beforeImage, 'before');
-  } catch (error) {
-    throw new Error(`Failed to upload before image: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
+  // Check if this is a single-image upload (same file used for before and after)
+  const isSingleImage = projectData.beforeImage === projectData.afterImage;
 
-  try {
-    afterUrl = await uploadImage(projectData.afterImage, 'after');
-  } catch (error) {
-    throw new Error(`Failed to upload after image: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  if (isSingleImage) {
+    // Single image mode: upload once and use same URL for both fields
+    try {
+      beforeUrl = await uploadImage(projectData.beforeImage, 'single');
+      afterUrl = beforeUrl; // Use the same URL for both
+    } catch (error) {
+      throw new Error(`Failed to upload image: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  } else {
+    // Before/After mode: upload separately
+    try {
+      beforeUrl = await uploadImage(projectData.beforeImage, 'before');
+    } catch (error) {
+      throw new Error(`Failed to upload before image: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+
+    try {
+      afterUrl = await uploadImage(projectData.afterImage, 'after');
+    } catch (error) {
+      throw new Error(`Failed to upload after image: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   const { error } = await supabase
