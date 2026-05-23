@@ -74,8 +74,13 @@ function generateCode(): string {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default function JobManager() {
-  const [activeTab, setActiveTab] = useState<'jobs' | 'quotes'>('jobs');
+interface JobManagerProps {
+  initialTab?: 'jobs' | 'quotes';
+  onQuoteCountChange?: (count: number) => void;
+}
+
+export default function JobManager({ initialTab = 'jobs', onQuoteCountChange }: JobManagerProps) {
+  const [activeTab, setActiveTab] = useState<'jobs' | 'quotes'>(initialTab);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -116,6 +121,7 @@ export default function JobManager() {
     try {
       const data = await fetchQuoteRequests();
       setQuotes(data);
+      onQuoteCountChange?.(data.filter(q => q.status === 'pending').length);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
       setQuotesError(`Could not load quote requests (${msg}).`);

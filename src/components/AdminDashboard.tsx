@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { 
   Plus, 
@@ -17,6 +17,7 @@ import {
   LogOut,
   BarChart2,
   ClipboardList,
+  FileText,
   X,
   AlertCircle,
   CheckCircle,
@@ -28,6 +29,7 @@ import {
   uploadProject, deleteProject, validateImageFile,
   addService, updateService, deleteService,
   addTestimonial, updateTestimonial, deleteTestimonial,
+  fetchQuoteRequests,
 } from '../services/database';
 import { supabase } from '../lib/supabase';
 import AnalyticsOverview from './AnalyticsOverview';
@@ -48,7 +50,14 @@ export default function AdminDashboard({
   onRefresh,
   onClose
 }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'projects' | 'services' | 'testimonials' | 'jobs'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'projects' | 'services' | 'testimonials' | 'jobs' | 'quotes'>('overview');
+  const [pendingQuoteCount, setPendingQuoteCount] = useState(0);
+
+  useEffect(() => {
+    fetchQuoteRequests()
+      .then(qs => setPendingQuoteCount(qs.filter(q => q.status === 'pending').length))
+      .catch(() => {});
+  }, []);
   const [loading, setLoading] = useState(false);
 
   // Service form state
@@ -367,6 +376,17 @@ export default function AdminDashboard({
             className={`flex items-center gap-3 px-4 h-11 text-xs uppercase tracking-widest font-bold transition-all ${activeTab === 'jobs' ? 'bg-brand-teal text-white' : 'text-gray-400 hover:text-white'}`}
           >
             <ClipboardList className="w-4 h-4" /> Job Tracker
+          </button>
+          <button 
+            onClick={() => setActiveTab('quotes')}
+            className={`flex items-center gap-3 px-4 h-11 text-xs uppercase tracking-widest font-bold transition-all ${activeTab === 'quotes' ? 'bg-brand-teal text-white' : 'text-gray-400 hover:text-white'}`}
+          >
+            <FileText className="w-4 h-4" /> Quote Requests
+            {pendingQuoteCount > 0 && (
+              <span className="ml-auto bg-brand-yellow text-brand-slate text-[9px] font-extrabold rounded-full w-5 h-5 flex items-center justify-center">
+                {pendingQuoteCount}
+              </span>
+            )}
           </button>
         </nav>
 
@@ -1065,7 +1085,18 @@ export default function AdminDashboard({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
             >
-              <JobManager />
+              <JobManager initialTab="jobs" />
+            </motion.div>
+          )}
+
+          {activeTab === 'quotes' && (
+            <motion.div
+              key="quotes"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <JobManager initialTab="quotes" onQuoteCountChange={setPendingQuoteCount} />
             </motion.div>
           )}
         </AnimatePresence>
