@@ -12,24 +12,6 @@ export interface Project {
   afterImage: string;
 }
 
-export const PROJECTS: Project[] = [
-  {
-    id: "p1",
-    title: "Vintage Leather Couch Restoration",
-    location: "Sea Point",
-    category: "Craftsmanship",
-    beforeImage: "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&fit=crop&q=80&w=800",
-    afterImage: "https://images.unsplash.com/photo-1493663284031-b7e3aefcae8e?auto=format&fit=crop&q=80&w=800",
-  },
-  {
-    id: "p2",
-    title: "Deep Clean & Sanitization",
-    location: "Tamboerskloof",
-    category: "Cleaning",
-    beforeImage: "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&q=80&w=800",
-    afterImage: "https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?auto=format&fit=crop&q=80&w=800",
-  }
-];
 
 export const WEBSITE_COPY = {
   hero: {
@@ -62,74 +44,6 @@ export interface Service {
   iconName: string;
 }
 
-export const SERVICES: Service[] = [
-  // Restoration
-  {
-    id: "s1",
-    title: "Upholstery Restoration",
-    category: "Restoration",
-    shortDescription: "Complete reupholstering, redesigning, and upgrading of heritage and modern furniture.",
-    iconName: "Sofa",
-  },
-  {
-    id: "s2",
-    title: "Leather Care & Repair",
-    category: "Restoration",
-    shortDescription: "Master restoration for leather: re-dyeing, crack/burn repairs, polishing, and deep conditioning.",
-    iconName: "Wind",
-  },
-  {
-    id: "s3",
-    title: "Recliner & Sofa Repair",
-    category: "Restoration",
-    shortDescription: "Expert mechanical and structural repairs for recliners and weighted lounge suites.",
-    iconName: "Settings",
-  },
-  // Manufacturing
-  {
-    id: "s4",
-    title: "Custom Manufacturing",
-    category: "Manufacturing",
-    shortDescription: "Bespoke headboards, ottomans, sofas, and chairs designed and built to your exact specs.",
-    iconName: "Hammer",
-  },
-  {
-    id: "s5",
-    title: "Automotive Upholstery",
-    category: "Manufacturing",
-    shortDescription: "Complete car interior transformations: seats, panels, and roof linings.",
-    iconName: "Car",
-  },
-  {
-    id: "s6",
-    title: "Outdoor Solutions",
-    category: "Manufacturing",
-    shortDescription: "Custom pool covers and outdoor seating using premium UV and water-resistant fabrics.",
-    iconName: "Sun",
-  },
-  // Specialized Care
-  {
-    id: "s7",
-    title: "Professional Deep Cleaning",
-    category: "SpecializedCare",
-    shortDescription: "Surgical-grade cleaning for furniture, carpets, and mattresses removing all allergens.",
-    iconName: "ShieldCheck",
-  },
-  {
-    id: "s8",
-    title: "Specialized Equipment",
-    category: "SpecializedCare",
-    shortDescription: "Precise upholstery repairs for dental chairs and specialized medical/industrial seating.",
-    iconName: "Stethoscope",
-  },
-  {
-    id: "s9",
-    title: "Scotchgard Protection",
-    category: "SpecializedCare",
-    shortDescription: "Professional grade stain protection treatments for interior and exterior furniture.",
-    iconName: "GlassWater",
-  },
-];
 
 export interface Testimonial {
   id: string;
@@ -139,27 +53,4 @@ export interface Testimonial {
   quote: string;
 }
 
-export const TESTIMONIALS: Testimonial[] = [
-  {
-    id: "t1",
-    clientName: "Sarah M.",
-    location: "Sea Point",
-    serviceRendered: "Full Upholstery Restoration",
-    quote: "I thought my heirloom couch was beyond saving. They didn't just clean it; they restored its soul. Truly elite work.",
-  },
-  {
-    id: "t2",
-    clientName: "David K.",
-    location: "Tamboerskloof",
-    serviceRendered: "Custom Kitchen Cabinetry",
-    quote: "The precision in their woodwork is staggering. It's rare to find a team that understands both the art and the technicality.",
-  },
-  {
-    id: "t3",
-    clientName: "Elena R.",
-    location: "Constantia",
-    serviceRendered: "Deep Cleaning & Odor Removal",
-    quote: "Highly professional and meticulous. My rugs look brand new, and the team was a joy to have in the house.",
-  },
-];
 

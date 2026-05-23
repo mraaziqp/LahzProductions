@@ -262,6 +262,45 @@ export default function App() {
         </div>
       </section>
 
+      {/* Job Tracker Section */}
+      <section id="track" className="py-20 md:py-28 px-6 bg-gray-50 border-y border-gray-100 scroll-mt-20">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid lg:grid-cols-2 gap-16 items-start">
+            <div>
+              <span className="text-xs uppercase tracking-[0.4em] text-brand-teal font-extrabold mb-6 block">
+                Live Updates
+              </span>
+              <h2 className="text-4xl md:text-6xl font-serif text-brand-slate leading-tight mb-6">
+                Track your <br className="hidden md:block" />
+                <span className="italic text-brand-teal">job progress</span>
+              </h2>
+              <p className="text-gray-400 text-lg leading-relaxed font-light max-w-md">
+                Enter the tracking code we sent you to see exactly where your item is — from 
+                the moment it's booked to the day it's ready for collection.
+              </p>
+              <div className="mt-8 flex flex-col gap-3">
+                {[
+                  { step: '01', label: 'Scheduled', desc: 'Booked & in the queue.' },
+                  { step: '02', label: 'Prepping / Stripping', desc: 'Item being prepared.' },
+                  { step: '03', label: 'In Production', desc: 'Our team is actively working on it.' },
+                  { step: '04', label: 'Quality Check', desc: 'Final inspection underway.' },
+                  { step: '05', label: 'Ready for Delivery', desc: 'Your item is complete!' },
+                ].map(s => (
+                  <div key={s.step} className="flex items-center gap-4">
+                    <span className="text-xs font-mono font-bold text-brand-teal/40 w-6">{s.step}</span>
+                    <span className="text-sm font-bold text-brand-slate">{s.label}</span>
+                    <span className="text-xs text-gray-400">— {s.desc}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="bg-white border border-gray-100 p-8 md:p-12 shadow-sm rounded-sm">
+              <JobTracker initialCode={initialTrackCode} />
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Optimized Services (Tabbed Interface) */}
       <section id="services" className="py-20 md:py-32 bg-white border-y border-gray-100 scroll-mt-20">
         <div className="max-w-7xl mx-auto px-6">
@@ -509,44 +548,6 @@ export default function App() {
               </p>
             </div>
             <QuoteEstimator />
-          </div>
-        </div>
-      </section>
-
-      {/* Job Tracker Section */}
-      <section id="track" className="py-20 md:py-32 px-6 bg-gray-50 border-y border-gray-100 scroll-mt-20">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid lg:grid-cols-2 gap-16 items-start">
-            <div>
-              <span className="text-xs uppercase tracking-[0.4em] text-brand-teal font-extrabold mb-6 block">
-                Live Updates
-              </span>
-              <h2 className="text-4xl md:text-6xl font-serif text-brand-slate leading-tight mb-6">
-                Track your <br className="hidden md:block" />
-                <span className="italic text-brand-teal">job progress</span>
-              </h2>
-              <p className="text-gray-400 text-lg leading-relaxed font-light max-w-md">
-                Enter the tracking code we sent you to see exactly where your item is — from 
-                the moment it's booked to the day it's ready for collection.
-              </p>
-              <div className="mt-8 flex flex-col gap-3">
-                {[
-                  { step: '01', label: 'Job Scheduled', desc: 'Booked & in the queue.' },
-                  { step: '02', label: 'In Progress', desc: 'Our team is actively working on it.' },
-                  { step: '03', label: 'Quality Check', desc: 'Final inspection underway.' },
-                  { step: '04', label: 'Ready for Delivery', desc: 'Your item is complete!' },
-                ].map(s => (
-                  <div key={s.step} className="flex items-center gap-4">
-                    <span className="text-xs font-mono font-bold text-brand-teal/40 w-6">{s.step}</span>
-                    <span className="text-sm font-bold text-brand-slate">{s.label}</span>
-                    <span className="text-xs text-gray-400">— {s.desc}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="bg-white border border-gray-100 p-8 md:p-12 shadow-sm rounded-sm">
-              <JobTracker initialCode={initialTrackCode} />
-            </div>
           </div>
         </div>
       </section>
