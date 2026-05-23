@@ -131,7 +131,7 @@ async function uploadImage(file: string | File, path: string): Promise<string> {
   return data.publicUrl;
 }
 
-export async function uploadProject(projectData: Partial<Project>): Promise<void> {
+export async function uploadProject(projectData: Partial<Project> & { displayMode?: string }): Promise<void> {
   // Validate before and after images exist
   if (!projectData.beforeImage || !projectData.afterImage) {
     throw new Error('Both before and after images are required');
@@ -148,13 +148,19 @@ export async function uploadProject(projectData: Partial<Project>): Promise<void
   let beforeUrl: string;
   let afterUrl: string;
 
-  // Check if this is a single-image upload (same file used for before and after)
+  // Determine storage path based on display mode for URL-based rendering
+  const storagePath =
+    projectData.displayMode === 'composite' ? 'composite'
+    : projectData.displayMode === 'afterOnly'  ? 'after-only'
+    : projectData.displayMode === 'beforeOnly' ? 'before-only'
+    : null;
+
   const isSingleImage = projectData.beforeImage === projectData.afterImage;
 
   if (isSingleImage) {
     // Single image mode: upload once and use same URL for both fields
     try {
-      beforeUrl = await uploadImage(projectData.beforeImage, 'single');
+      beforeUrl = await uploadImage(projectData.beforeImage, storagePath ?? 'single');
       afterUrl = beforeUrl; // Use the same URL for both
     } catch (error) {
       throw new Error(`Failed to upload image: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -189,8 +195,7 @@ export async function uploadProject(projectData: Partial<Project>): Promise<void
   }
 }
 
-export async function updateService(service: Service): Promise<void> {
-  const { error } = await supabase
+export async function updateService(service: Service): Promise<void> {  const { error } = await supabase
     .from('services')
     .upsert({
       id: service.id.includes('v-') ? undefined : service.id, // Handle potential temp IDs
@@ -205,6 +210,29 @@ export async function updateService(service: Service): Promise<void> {
 export async function deleteProject(id: string): Promise<void> {
   const { error } = await supabase.from('projects').delete().eq('id', id);
   if (error) throw error;
+}
+
+// --- Job WIP Photo Upload ---
+
+export async function uploadWipPhoto(file: File, jobId: string): Promise<string> {
+  const validation = validateImageFile(file);
+  if (!validation.valid) {
+    throw new Error(validation.error || 'Invalid image');
+  }
+
+  const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+  const path = `${jobId}/${Date.now()}.${ext}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('wip-photos')
+    .upload(path, file, { upsert: true, contentType: file.type });
+
+  if (uploadError) {
+    throw new Error(`WIP upload failed: ${uploadError.message}`);
+  }
+
+  const { data } = supabase.storage.from('wip-photos').getPublicUrl(path);
+  return data.publicUrl;
 }
 
 // --- Testimonials CRUD ---

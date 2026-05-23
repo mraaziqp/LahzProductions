@@ -166,3 +166,56 @@ CREATE POLICY "Admin update gallery images"
 ON storage.objects FOR UPDATE
 TO authenticated
 USING ( bucket_id = 'gallery-images' );
+
+-- ============================================================
+-- CLIENT PORTAL UPGRADE — Run in Supabase SQL Editor
+-- ============================================================
+
+-- 14. Add Client Portal columns to jobs table
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS wip_image_url TEXT;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS latest_note   TEXT;
+
+-- 15. Upgrade job_status ENUM to 5 production stages
+--     PostgreSQL cannot remove ENUM values, so we recreate the type.
+ALTER TABLE jobs ALTER COLUMN status TYPE TEXT;
+DROP TYPE IF EXISTS job_status;
+
+CREATE TYPE job_status AS ENUM (
+  'Scheduled',
+  'Prepping/Stripping',
+  'In Production',
+  'Quality Check',
+  'Ready for Delivery'
+);
+
+-- Migrate any rows using the retired 'In Progress' value
+UPDATE jobs SET status = 'In Production' WHERE status = 'In Progress';
+
+-- Cast the text column back to the new enum type
+ALTER TABLE jobs ALTER COLUMN status TYPE job_status USING status::job_status;
+
+-- 16. Create storage bucket for WIP progress photos (public)
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('wip-photos', 'wip-photos', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Storage policies for wip-photos bucket
+CREATE POLICY "Public read wip photos"
+ON storage.objects FOR SELECT
+USING (bucket_id = 'wip-photos');
+
+CREATE POLICY "Admin upload wip photos"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (bucket_id = 'wip-photos');
+
+CREATE POLICY "Admin update wip photos"
+ON storage.objects FOR UPDATE
+TO authenticated
+USING (bucket_id = 'wip-photos');
+
+CREATE POLICY "Admin delete wip photos"
+ON storage.objects FOR DELETE
+TO authenticated
+USING (bucket_id = 'wip-photos');
+

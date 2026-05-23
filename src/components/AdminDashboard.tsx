@@ -140,7 +140,7 @@ export default function AdminDashboard({
   } as any);
 
   // Upload mode controls how project images are stored and displayed
-  const [uploadMode, setUploadMode] = useState<'beforeAfter' | 'composite' | 'single'>('beforeAfter');
+  const [uploadMode, setUploadMode] = useState<'beforeAfter' | 'composite' | 'single' | 'beforeOnly' | 'afterOnly'>('beforeAfter');
   const onDropComposite = useCallback(async (acceptedFiles: File[], rejectedFiles: any[]) => {
     setProjectFormErrors((prev: any) => ({ ...prev, compositeImage: '' }));
     
@@ -199,6 +199,36 @@ export default function AdminDashboard({
     disabled: loading
   } as any);
 
+  const onDropBeforeOnly = useCallback(async (acceptedFiles: File[], rejectedFiles: any[]) => {
+    setProjectFormErrors((prev: any) => ({ ...prev, beforeOnlyImage: '' }));
+    if (rejectedFiles.length > 0) { setProjectFormErrors((prev: any) => ({ ...prev, beforeOnlyImage: 'Invalid file format.' })); return; }
+    const file = acceptedFiles[0]; if (!file) return;
+    const validation = validateImageFile(file);
+    if (!validation.valid) { setProjectFormErrors((prev: any) => ({ ...prev, beforeOnlyImage: validation.error || 'Invalid image' })); return; }
+    const preview = await createImagePreview(file);
+    setPreviewUrls((prev: any) => ({ ...prev, beforeOnlyImage: preview }));
+    setNewProject((prev: any) => ({ ...prev, beforeOnlyImageFile: file }));
+  }, [createImagePreview]);
+
+  const { getRootProps: getRootPropsBeforeOnly, getInputProps: getInputPropsBeforeOnly, isDragActive: isDragActiveBeforeOnly } = useDropzone({
+    onDrop: onDropBeforeOnly, accept: { 'image/*': ['.jpg', '.jpeg', '.png', '.webp'] }, multiple: false, disabled: loading
+  } as any);
+
+  const onDropAfterOnly = useCallback(async (acceptedFiles: File[], rejectedFiles: any[]) => {
+    setProjectFormErrors((prev: any) => ({ ...prev, afterOnlyImage: '' }));
+    if (rejectedFiles.length > 0) { setProjectFormErrors((prev: any) => ({ ...prev, afterOnlyImage: 'Invalid file format.' })); return; }
+    const file = acceptedFiles[0]; if (!file) return;
+    const validation = validateImageFile(file);
+    if (!validation.valid) { setProjectFormErrors((prev: any) => ({ ...prev, afterOnlyImage: validation.error || 'Invalid image' })); return; }
+    const preview = await createImagePreview(file);
+    setPreviewUrls((prev: any) => ({ ...prev, afterOnlyImage: preview }));
+    setNewProject((prev: any) => ({ ...prev, afterOnlyImageFile: file }));
+  }, [createImagePreview]);
+
+  const { getRootProps: getRootPropsAfterOnly, getInputProps: getInputPropsAfterOnly, isDragActive: isDragActiveAfterOnly } = useDropzone({
+    onDrop: onDropAfterOnly, accept: { 'image/*': ['.jpg', '.jpeg', '.png', '.webp'] }, multiple: false, disabled: loading
+  } as any);
+
   const handleAddProject = async () => {
     // Clear previous errors
     setUploadError(null);
@@ -218,6 +248,14 @@ export default function AdminDashboard({
     } else if (uploadMode === 'single') {
       if (!(newProject as any).singleImageFile) {
         errors.singleImage = 'Please upload a single image';
+      }
+    } else if (uploadMode === 'beforeOnly') {
+      if (!(newProject as any).beforeOnlyImageFile) {
+        errors.beforeOnlyImage = 'Please upload a before photo';
+      }
+    } else if (uploadMode === 'afterOnly') {
+      if (!(newProject as any).afterOnlyImageFile) {
+        errors.afterOnlyImage = 'Please upload an after photo';
       }
     } else {
       if (!(newProject as any).beforeImageFile) {
@@ -239,7 +277,11 @@ export default function AdminDashboard({
         ? (newProject as any).compositeImageFile
         : uploadMode === 'single'
           ? (newProject as any).singleImageFile
-        : undefined;
+          : uploadMode === 'beforeOnly'
+            ? (newProject as any).beforeOnlyImageFile
+            : uploadMode === 'afterOnly'
+              ? (newProject as any).afterOnlyImageFile
+              : undefined;
       
       await uploadProject({
         title: newProject.title,
@@ -247,6 +289,7 @@ export default function AdminDashboard({
         category: newProject.category as any,
         beforeImage: uploadMode === 'beforeAfter' ? (newProject as any).beforeImageFile : imageFile,
         afterImage: uploadMode === 'beforeAfter' ? (newProject as any).afterImageFile : imageFile,
+        displayMode: uploadMode === 'beforeAfter' ? undefined : uploadMode,
       });
       
       // Reset form on success
@@ -264,7 +307,7 @@ export default function AdminDashboard({
   };
 
   const handleClearImages = () => {
-    setNewProject((prev: any) => ({ ...prev, beforeImageFile: undefined, afterImageFile: undefined, compositeImageFile: undefined, singleImageFile: undefined }));
+    setNewProject((prev: any) => ({ ...prev, beforeImageFile: undefined, afterImageFile: undefined, compositeImageFile: undefined, singleImageFile: undefined, beforeOnlyImageFile: undefined, afterOnlyImageFile: undefined }));
     setPreviewUrls({});
     setProjectFormErrors({});
   };
@@ -402,22 +445,32 @@ export default function AdminDashboard({
                 </div>
 
                 {/* Image mode toggle */}
-                <div className="flex items-center gap-4 mb-6">
+                <div className="flex flex-wrap items-center gap-2 mb-6">
                   <button
                     type="button"
-                    onClick={() => { setUploadMode('beforeAfter'); setPreviewUrls(p => ({ ...p, beforeImage: '', afterImage: '' })); setNewProject(p => ({ ...p, compositeImageFile: undefined, singleImageFile: undefined })); setProjectFormErrors({}); }}
+                    onClick={() => { setUploadMode('beforeAfter'); setPreviewUrls(p => ({ ...p, beforeImage: '', afterImage: '' })); setNewProject(p => ({ ...p, compositeImageFile: undefined, singleImageFile: undefined, beforeOnlyImageFile: undefined, afterOnlyImageFile: undefined })); setProjectFormErrors({}); }}
                     className={`h-9 px-5 text-[10px] uppercase tracking-widest font-bold transition-all rounded-sm ${ uploadMode === 'beforeAfter' ? 'bg-brand-teal text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
-                  >Separate Before / After</button>
+                  >Before / After Slider</button>
                   <button
                     type="button"
-                    onClick={() => { setUploadMode('composite'); setPreviewUrls(p => ({ ...p, compositeImage: '' })); setNewProject(p => ({ ...p, beforeImageFile: undefined, afterImageFile: undefined, singleImageFile: undefined })); setProjectFormErrors({}); }}
+                    onClick={() => { setUploadMode('composite'); setPreviewUrls(p => ({ ...p, compositeImage: '' })); setNewProject(p => ({ ...p, beforeImageFile: undefined, afterImageFile: undefined, singleImageFile: undefined, beforeOnlyImageFile: undefined, afterOnlyImageFile: undefined })); setProjectFormErrors({}); }}
                     className={`h-9 px-5 text-[10px] uppercase tracking-widest font-bold transition-all rounded-sm ${ uploadMode === 'composite' ? 'bg-brand-teal text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
-                  >Single Composite Photo</button>
+                  >Featured Photo</button>
                   <button
                     type="button"
-                    onClick={() => { setUploadMode('single'); setPreviewUrls(p => ({ ...p, singleImage: '' })); setNewProject(p => ({ ...p, beforeImageFile: undefined, afterImageFile: undefined, compositeImageFile: undefined })); setProjectFormErrors({}); }}
+                    onClick={() => { setUploadMode('single'); setPreviewUrls(p => ({ ...p, singleImage: '' })); setNewProject(p => ({ ...p, beforeImageFile: undefined, afterImageFile: undefined, compositeImageFile: undefined, beforeOnlyImageFile: undefined, afterOnlyImageFile: undefined })); setProjectFormErrors({}); }}
                     className={`h-9 px-5 text-[10px] uppercase tracking-widest font-bold transition-all rounded-sm ${ uploadMode === 'single' ? 'bg-brand-teal text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
-                  >Single Image (No Slider)</button>
+                  >Single Photo</button>
+                  <button
+                    type="button"
+                    onClick={() => { setUploadMode('afterOnly'); setPreviewUrls(p => ({ ...p, afterOnlyImage: '' })); setNewProject(p => ({ ...p, beforeImageFile: undefined, afterImageFile: undefined, compositeImageFile: undefined, singleImageFile: undefined, beforeOnlyImageFile: undefined })); setProjectFormErrors({}); }}
+                    className={`h-9 px-5 text-[10px] uppercase tracking-widest font-bold transition-all rounded-sm ${ uploadMode === 'afterOnly' ? 'bg-brand-teal text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                  >After Only</button>
+                  <button
+                    type="button"
+                    onClick={() => { setUploadMode('beforeOnly'); setPreviewUrls(p => ({ ...p, beforeOnlyImage: '' })); setNewProject(p => ({ ...p, beforeImageFile: undefined, afterImageFile: undefined, compositeImageFile: undefined, singleImageFile: undefined, afterOnlyImageFile: undefined })); setProjectFormErrors({}); }}
+                    className={`h-9 px-5 text-[10px] uppercase tracking-widest font-bold transition-all rounded-sm ${ uploadMode === 'beforeOnly' ? 'bg-brand-teal text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                  >Before Only</button>
                 </div>
 
                 {/* Error Messages */}
@@ -521,6 +574,68 @@ export default function AdminDashboard({
                       </motion.div>
                     )}
                   </div>
+                ) : uploadMode === 'afterOnly' ? (
+                  <div className="flex flex-col gap-4 mb-10">
+                    <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">After Photo <span className="text-gray-300 normal-case">(displayed with an "After" label — great for finished work)</span></label>
+                    <div
+                      {...getRootPropsAfterOnly()}
+                      className={`aspect-video border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-6 cursor-pointer transition-all ${isDragActiveAfterOnly ? 'border-brand-teal bg-brand-teal/5' : (previewUrls.afterOnlyImage ? 'border-brand-teal bg-teal-50/10 shadow-sm' : 'border-gray-200 hover:border-brand-teal/50')}`}
+                    >
+                      <input {...getInputPropsAfterOnly()} disabled={loading} />
+                      {previewUrls.afterOnlyImage ? (
+                        <div className="flex flex-col items-center w-full h-full">
+                          <img src={previewUrls.afterOnlyImage} alt="After Preview" className="max-h-full max-w-full object-contain rounded" />
+                          <div className="mt-2 text-center">
+                            <span className="text-[10px] uppercase font-bold text-brand-teal">✓ Image Ready</span>
+                            <span className="text-[8px] text-gray-500 block mt-1">{(newProject as any).afterOnlyImageFile?.name}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <UploadCloud className="w-12 h-12 text-gray-300 mb-3" />
+                          <span className="text-[10px] uppercase tracking-widest font-bold text-gray-400 mb-1">Upload After Photo</span>
+                          <span className="text-[8px] text-gray-300">Drag & Drop or click to browse</span>
+                          <span className="text-[8px] text-gray-400 mt-2">Shown with a teal "After" badge</span>
+                        </>
+                      )}
+                    </div>
+                    {projectFormErrors.afterOnlyImage && (
+                      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700 flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4" /> {projectFormErrors.afterOnlyImage}
+                      </motion.div>
+                    )}
+                  </div>
+                ) : uploadMode === 'beforeOnly' ? (
+                  <div className="flex flex-col gap-4 mb-10">
+                    <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Before Photo <span className="text-gray-300 normal-case">(displayed with a "Before" label — great for items awaiting work)</span></label>
+                    <div
+                      {...getRootPropsBeforeOnly()}
+                      className={`aspect-video border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-6 cursor-pointer transition-all ${isDragActiveBeforeOnly ? 'border-brand-teal bg-brand-teal/5' : (previewUrls.beforeOnlyImage ? 'border-brand-teal bg-teal-50/10 shadow-sm' : 'border-gray-200 hover:border-brand-teal/50')}`}
+                    >
+                      <input {...getInputPropsBeforeOnly()} disabled={loading} />
+                      {previewUrls.beforeOnlyImage ? (
+                        <div className="flex flex-col items-center w-full h-full">
+                          <img src={previewUrls.beforeOnlyImage} alt="Before Preview" className="max-h-full max-w-full object-contain rounded" />
+                          <div className="mt-2 text-center">
+                            <span className="text-[10px] uppercase font-bold text-brand-teal">✓ Image Ready</span>
+                            <span className="text-[8px] text-gray-500 block mt-1">{(newProject as any).beforeOnlyImageFile?.name}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <UploadCloud className="w-12 h-12 text-gray-300 mb-3" />
+                          <span className="text-[10px] uppercase tracking-widest font-bold text-gray-400 mb-1">Upload Before Photo</span>
+                          <span className="text-[8px] text-gray-300">Drag & Drop or click to browse</span>
+                          <span className="text-[8px] text-gray-400 mt-2">Shown with a grey "Before" badge</span>
+                        </>
+                      )}
+                    </div>
+                    {projectFormErrors.beforeOnlyImage && (
+                      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700 flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4" /> {projectFormErrors.beforeOnlyImage}
+                      </motion.div>
+                    )}
+                  </div>
                 ) : (
                 <div className="grid md:grid-cols-2 gap-8 mb-10">
                   <div className="flex flex-col gap-4">
@@ -607,7 +722,7 @@ export default function AdminDashboard({
                 <div className="flex gap-3 mb-8">
                   <button 
                     onClick={handleAddProject}
-                    disabled={!newProject.title || (uploadMode === 'composite' ? !(newProject as any).compositeImageFile : uploadMode === 'single' ? !(newProject as any).singleImageFile : (!(newProject as any).beforeImageFile || !(newProject as any).afterImageFile)) || loading}
+                    disabled={!newProject.title || (uploadMode === 'composite' ? !(newProject as any).compositeImageFile : uploadMode === 'single' ? !(newProject as any).singleImageFile : uploadMode === 'afterOnly' ? !(newProject as any).afterOnlyImageFile : uploadMode === 'beforeOnly' ? !(newProject as any).beforeOnlyImageFile : (!(newProject as any).beforeImageFile || !(newProject as any).afterImageFile)) || loading}
                     className="flex-1 py-5 bg-brand-teal text-white uppercase tracking-[0.2em] text-xs font-bold hover:bg-brand-teal/90 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-3 shadow-xl shadow-brand-teal/20"
                   >
                     {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} 
@@ -615,7 +730,7 @@ export default function AdminDashboard({
                   </button>
                   <button 
                     onClick={handleClearImages}
-                    disabled={!((newProject as any).beforeImageFile || (newProject as any).afterImageFile || (newProject as any).compositeImageFile || (newProject as any).singleImageFile) || loading}
+                    disabled={!((newProject as any).beforeImageFile || (newProject as any).afterImageFile || (newProject as any).compositeImageFile || (newProject as any).singleImageFile || (newProject as any).beforeOnlyImageFile || (newProject as any).afterOnlyImageFile) || loading}
                     className="px-6 py-5 bg-gray-100 text-gray-600 uppercase tracking-[0.1em] text-xs font-bold hover:bg-gray-200 transition-all disabled:opacity-20 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     <X className="w-4 h-4" /> Clear

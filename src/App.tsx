@@ -35,6 +35,7 @@ import BeforeAfterSlider from "./components/BeforeAfterSlider";
 import AdminDashboard from "./components/AdminDashboard";
 import AdminAuth from "./components/AdminAuth";
 import QuoteEstimator from "./components/QuoteEstimator";
+import JobTracker from "./components/JobTracker";
 import { supabase } from "./lib/supabase";
 import { fetchProjects, fetchServices, fetchTestimonials } from "./services/database";
 
@@ -60,6 +61,12 @@ export default function App() {
   const [activeServiceTab, setActiveServiceTab] = useState<ServiceCategory>("Restoration");
   const [testimonialIndex, setTestimonialIndex] = useState(0);
   const [isAboutExpanded, setIsAboutExpanded] = useState(false);
+
+  // Read pre-filled tracking code from URL ?track=CODE
+  const [initialTrackCode] = useState<string | undefined>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("track") ?? undefined;
+  });
   
   // Data State
   const [projects, setProjects] = useState<Project[]>([]);
@@ -159,6 +166,7 @@ export default function App() {
             <a href="#services" className="text-sm uppercase tracking-widest hover:text-brand-teal transition-all">Services</a>
             <a href="#about" className="text-sm uppercase tracking-widest hover:text-brand-teal transition-all">Why Us</a>
             <a href="#gallery" className="text-sm uppercase tracking-widest hover:text-brand-teal transition-all">Showcase</a>
+            <a href="#track" className="text-sm uppercase tracking-widest hover:text-brand-teal transition-all">Track Job</a>
             <a
               href={`#${contactSectionId}`}
               className="h-11 px-6 bg-brand-teal text-white text-xs uppercase tracking-widest font-bold hover:bg-brand-teal/90 transition-all rounded-sm shadow-sm flex items-center"
@@ -189,6 +197,7 @@ export default function App() {
               <a href="#services" onClick={() => setIsMenuOpen(false)} className="text-sm uppercase tracking-widest font-bold py-2">Services</a>
               <a href="#about" onClick={() => setIsMenuOpen(false)} className="text-sm uppercase tracking-widest font-bold py-2">Why Us</a>
               <a href="#gallery" onClick={() => setIsMenuOpen(false)} className="text-sm uppercase tracking-widest font-bold py-2">Showcase</a>
+              <a href="#track" onClick={() => setIsMenuOpen(false)} className="text-sm uppercase tracking-widest font-bold py-2">Track Job</a>
               <a href={`#${contactSectionId}`} onClick={() => setIsMenuOpen(false)} className="text-sm uppercase tracking-widest font-bold py-2">Contact</a>
               <button onClick={() => { setIsMenuOpen(false); setShowAdmin(true); }} className="text-sm uppercase tracking-widest font-bold py-2 text-left flex items-center gap-2">
                 <Lock className="w-4 h-4" /> Staff Access
@@ -500,6 +509,44 @@ export default function App() {
               </p>
             </div>
             <QuoteEstimator />
+          </div>
+        </div>
+      </section>
+
+      {/* Job Tracker Section */}
+      <section id="track" className="py-20 md:py-32 px-6 bg-gray-50 border-y border-gray-100 scroll-mt-20">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid lg:grid-cols-2 gap-16 items-start">
+            <div>
+              <span className="text-xs uppercase tracking-[0.4em] text-brand-teal font-extrabold mb-6 block">
+                Live Updates
+              </span>
+              <h2 className="text-4xl md:text-6xl font-serif text-brand-slate leading-tight mb-6">
+                Track your <br className="hidden md:block" />
+                <span className="italic text-brand-teal">job progress</span>
+              </h2>
+              <p className="text-gray-400 text-lg leading-relaxed font-light max-w-md">
+                Enter the tracking code we sent you to see exactly where your item is — from 
+                the moment it's booked to the day it's ready for collection.
+              </p>
+              <div className="mt-8 flex flex-col gap-3">
+                {[
+                  { step: '01', label: 'Job Scheduled', desc: 'Booked & in the queue.' },
+                  { step: '02', label: 'In Progress', desc: 'Our team is actively working on it.' },
+                  { step: '03', label: 'Quality Check', desc: 'Final inspection underway.' },
+                  { step: '04', label: 'Ready for Delivery', desc: 'Your item is complete!' },
+                ].map(s => (
+                  <div key={s.step} className="flex items-center gap-4">
+                    <span className="text-xs font-mono font-bold text-brand-teal/40 w-6">{s.step}</span>
+                    <span className="text-sm font-bold text-brand-slate">{s.label}</span>
+                    <span className="text-xs text-gray-400">— {s.desc}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="bg-white border border-gray-100 p-8 md:p-12 shadow-sm rounded-sm">
+              <JobTracker initialCode={initialTrackCode} />
+            </div>
           </div>
         </div>
       </section>

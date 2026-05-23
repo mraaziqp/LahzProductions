@@ -13,14 +13,19 @@ interface BeforeAfterSliderProps {
 }
 
 export default function BeforeAfterSlider({ before, after, title, location }: BeforeAfterSliderProps) {
-  const isComposite = before === after;
+  const isSameImage = before === after;
+  const isBeforeOnly = isSameImage && before.includes('/before-only/');
+  const isAfterOnly  = isSameImage && before.includes('/after-only/');
+  const isComposite  = isSameImage && !isBeforeOnly && !isAfterOnly;
+
+  const singleLabel = isBeforeOnly ? 'Before' : isAfterOnly ? 'After' : null;
   
   return (
     <div className="group space-y-4">
       <div className={`relative rounded-lg overflow-hidden shadow-2xl bg-brand-slate/50 w-full transition-all duration-300 ${isComposite ? 'border-3 border-brand-yellow/70 ring-2 ring-brand-yellow/40 shadow-2xl shadow-brand-yellow/20 group-hover:border-brand-yellow group-hover:ring-4 group-hover:ring-brand-yellow/60 group-hover:shadow-brand-yellow/40' : 'border border-white/10 group-hover:border-white/20'}`}>
         <div className="w-full pt-[56.25%] relative bg-gray-800">
           <div className="absolute inset-0">
-            {isComposite ? (
+            {isSameImage ? (
               <img
                 src={before}
                 alt={title}
@@ -34,7 +39,6 @@ export default function BeforeAfterSlider({ before, after, title, location }: Be
                   <ReactCompareSliderImage 
                     src={before} 
                     alt="Before"
-                    className="grayscale opacity-85 hover:opacity-90 transition-opacity" 
                     loading="lazy" 
                     decoding="async" 
                   />
@@ -56,7 +60,12 @@ export default function BeforeAfterSlider({ before, after, title, location }: Be
                 Featured Photo
               </div>
             )}
-            {!isComposite && (
+            {singleLabel && (
+              <div className="absolute top-3 right-3 md:top-4 md:right-4 bg-brand-teal/90 backdrop-blur-md px-2 md:px-3 py-1 text-[9px] md:text-[10px] uppercase tracking-widest text-white font-bold border border-white/20 rounded-sm pointer-events-none">
+                {singleLabel}
+              </div>
+            )}
+            {!isSameImage && (
               <>
                 <div className="absolute top-3 left-3 md:top-4 md:left-4 bg-brand-slate/90 backdrop-blur-md px-2 md:px-3 py-1 text-[9px] md:text-[10px] uppercase tracking-widest text-white font-bold border border-white/20 rounded-sm pointer-events-none">
                   Before
