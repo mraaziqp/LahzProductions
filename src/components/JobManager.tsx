@@ -87,6 +87,7 @@ export default function JobManager() {
   // Quotes tab state
   const [quotes, setQuotes] = useState<QuoteRequest[]>([]);
   const [quotesLoading, setQuotesLoading] = useState(false);
+  const [quotesError, setQuotesError] = useState<string | null>(null);
   const [expandedQuoteId, setExpandedQuoteId] = useState<string | null>(null);
   const [quoteEdits, setQuoteEdits] = useState<Record<string, { price: string; note: string }>>({});
   const [sendingQuoteId, setSendingQuoteId] = useState<string | null>(null);
@@ -111,14 +112,19 @@ export default function JobManager() {
 
   const loadQuotes = useCallback(async () => {
     setQuotesLoading(true);
+    setQuotesError(null);
     try {
       const data = await fetchQuoteRequests();
       setQuotes(data);
-    } catch { /* silently ignore */ }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      setQuotesError(`Could not load quote requests (${msg}).`);
+    }
     setQuotesLoading(false);
   }, []);
 
   useEffect(() => { fetchJobs(); }, [fetchJobs]);
+  useEffect(() => { loadQuotes(); }, [loadQuotes]);
   useEffect(() => { if (activeTab === 'quotes') loadQuotes(); }, [activeTab, loadQuotes]);
 
   // ── Expand / edit ────────────────────────────────────────────────────────────
@@ -572,6 +578,17 @@ export default function JobManager() {
           {quotesLoading ? (
             <div className="flex items-center justify-center h-40">
               <Loader2 className="w-5 h-5 text-brand-teal animate-spin" />
+            </div>
+          ) : quotesError ? (
+            <div className="border border-red-200 bg-red-50 rounded-sm p-6 text-center">
+              <p className="text-xs uppercase tracking-widest font-bold text-red-600">Failed to load quote requests</p>
+              <p className="text-red-500 text-xs mt-2">{quotesError}</p>
+              <button
+                onClick={loadQuotes}
+                className="mt-4 h-9 px-4 border border-red-200 text-red-600 text-[10px] uppercase tracking-widest font-bold rounded-sm hover:bg-red-100 transition-all"
+              >
+                Retry
+              </button>
             </div>
           ) : quotes.length === 0 ? (
             <div className="border-2 border-dashed border-gray-200 rounded-sm p-16 text-center">

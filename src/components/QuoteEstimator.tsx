@@ -146,11 +146,11 @@ export default function QuoteEstimator() {
             <CheckCircle className="w-8 h-8 text-brand-teal" />
           </div>
           <div>
-            <h3 className="text-2xl font-serif text-brand-slate mb-2">Request received.</h3>
+            <h3 className="text-2xl font-serif text-brand-slate mb-2">Request submitted successfully.</h3>
             <p className="text-sm text-gray-400 max-w-sm leading-relaxed">
-              Your quote request has been submitted. We will review the details, assess the work
-              involved, and send you a personalised quote via WhatsApp within 48 hours. You will
-              be able to accept or decline directly from that message.
+              Thank you for your enquiry. We will review your requirements and send a
+              personalised quotation via WhatsApp within 48 hours. You will be able to
+              accept or decline directly from that message.
             </p>
           </div>
           <button

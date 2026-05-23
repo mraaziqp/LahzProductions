@@ -307,14 +307,18 @@ export async function saveQuoteRequest(data: {
   service_category: string;
   item_description: string;
 }): Promise<QuoteRequest> {
-  const quote_code = generateQuoteCode();
-  const { data: row, error } = await supabase
-    .from('quote_requests')
-    .insert({ ...data, quote_code })
-    .select()
-    .single();
-  if (error) throw error;
-  return row as QuoteRequest;
+  // Retry a few times in the rare case of quote_code collision.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const quote_code = generateQuoteCode();
+    const { data: row, error } = await supabase
+      .from('quote_requests')
+      .insert({ ...data, quote_code })
+      .select()
+      .single();
+    if (!error) return row as QuoteRequest;
+    if (error.code !== '23505') throw error;
+  }
+  throw new Error('Failed to generate a unique quote code. Please try again.');
 }
 
 export async function fetchQuoteRequests(): Promise<QuoteRequest[]> {

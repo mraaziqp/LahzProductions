@@ -664,13 +664,12 @@ export default function App() {
                 Quote Request
               </span>
               <h2 className="text-4xl md:text-6xl font-serif text-brand-slate leading-tight mb-6">
-                Your quote. <br className="hidden md:block" />
-                <span className="italic text-brand-teal">Reply within 48 hours.</span>
+                <span className="italic text-brand-teal">You will receive a reply within 48 hours.</span>
               </h2>
               <p className="text-gray-400 text-lg leading-relaxed font-light max-w-md">
-                Complete the form with your requirements and we will assess the
-                scope of work and respond with a personalised, itemised quote
-                within 48 hours. No obligation. No guesswork.
+                Submit your requirements through the form and our team will evaluate
+                the scope of work and provide a professional, itemised quotation.
+                We aim to respond within 48 hours.
               </p>
             </div>
             <QuoteEstimator />
