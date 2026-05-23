@@ -5,7 +5,8 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Wind, Sofa, ArrowRight, ArrowLeft, CheckCircle, MessageCircle } from "lucide-react";
+import { Wind, Sofa, ArrowRight, ArrowLeft, CheckCircle, MessageCircle, Loader2 } from "lucide-react";
+import { saveQuoteRequest } from "../services/database";
 
 type Category = "Deep Cleaning" | "Upholstery/Repair";
 
@@ -56,6 +57,8 @@ const slideVariants = {
 
 export default function QuoteEstimator() {
   const [step, setStep] = useState(1);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [form, setForm] = useState<FormData>({
     category: null,
     item: "",
@@ -92,9 +95,29 @@ export default function QuoteEstimator() {
     return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!form.name.trim() || !form.phone.trim() || !form.suburb.trim()) return;
+    setSubmitting(true);
+    // Open WhatsApp regardless of DB result
     window.open(buildWhatsAppMessage(), "_blank", "noreferrer");
+    try {
+      const itemDetails =
+        form.category === "Deep Cleaning"
+          ? `${form.size ? form.size + ' ' : ''}${form.item}`
+          : `${form.quantity > 1 ? form.quantity + 'x ' : ''}${form.item}`;
+      await saveQuoteRequest({
+        client_name: form.name.trim(),
+        client_phone: form.phone.trim(),
+        suburb: form.suburb.trim(),
+        service_category: form.category ?? '',
+        item_description: itemDetails,
+      });
+    } catch {
+      // DB save failure doesn't block the WhatsApp flow
+    } finally {
+      setSubmitting(false);
+      setSubmitted(true);
+    }
   };
 
   const canSubmit = form.name.trim() && form.phone.trim() && form.suburb.trim();
@@ -105,11 +128,36 @@ export default function QuoteEstimator() {
       <div className="h-1 bg-gray-100">
         <motion.div
           className="h-full bg-brand-teal"
-          animate={{ width: `${(step / 3) * 100}%` }}
+          animate={{ width: submitted ? '100%' : `${(step / 3) * 100}%` }}
           transition={{ duration: 0.4, ease: "easeInOut" }}
         />
       </div>
 
+      {submitted ? (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-8 min-h-[320px] flex flex-col items-center justify-center text-center gap-5"
+        >
+          <div className="w-16 h-16 bg-teal-50 rounded-full flex items-center justify-center">
+            <CheckCircle className="w-8 h-8 text-brand-teal" />
+          </div>
+          <div>
+            <h3 className="text-2xl font-serif text-brand-slate mb-2">Quote request sent!</h3>
+            <p className="text-sm text-gray-400 max-w-sm leading-relaxed">
+              Moulana will review your request and WhatsApp you a personalised quote within 48 hours.
+              Once you receive it, you'll be able to accept or decline directly from the message.
+            </p>
+          </div>
+          <button
+            onClick={() => { setSubmitted(false); setStep(1); setForm({ category: null, item: '', size: '', quantity: 1, name: '', phone: '', suburb: '' }); }}
+            className="text-xs uppercase tracking-widest font-bold text-brand-teal hover:opacity-70 transition-all mt-2"
+          >
+            Submit another request
+          </button>
+        </motion.div>
+      ) : (
+      <>
       {/* Step indicators */}
       <div className="flex items-center gap-2 px-8 pt-6">
         {[1, 2, 3].map(s => (
@@ -346,17 +394,19 @@ export default function QuoteEstimator() {
                 </button>
                 <button
                   onClick={handleSubmit}
-                  disabled={!canSubmit}
+                  disabled={!canSubmit || submitting}
                   className="flex items-center gap-3 h-14 px-10 bg-brand-teal text-white text-sm font-bold uppercase tracking-widest hover:bg-brand-teal/90 transition-all rounded-sm shadow-xl shadow-brand-teal/20 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  <MessageCircle className="w-5 h-5 fill-current text-brand-yellow" />
-                  Send Quote Request
+                  {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <MessageCircle className="w-5 h-5 fill-current text-brand-yellow" />}
+                  {submitting ? 'Sending…' : 'Send Quote Request'}
                 </button>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
+      </>
+      )}
     </div>
   );
 }

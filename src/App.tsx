@@ -37,7 +37,7 @@ import AdminAuth from "./components/AdminAuth";
 import QuoteEstimator from "./components/QuoteEstimator";
 import JobTracker from "./components/JobTracker";
 import { supabase } from "./lib/supabase";
-import { fetchProjects, fetchServices, fetchTestimonials } from "./services/database";
+import { fetchProjects, fetchServices, fetchTestimonials, getQuoteByCode, respondToQuote, QuoteRequest } from "./services/database";
 
 const IconMap: { [key: string]: any } = {
   Sofa,
@@ -67,6 +67,15 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     return params.get("track") ?? undefined;
   });
+
+  // Read quote acceptance code from URL ?quote=CODE
+  const [quoteCode] = useState<string | undefined>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("quote") ?? undefined;
+  });
+  const [quoteData, setQuoteData] = useState<QuoteRequest | null | 'loading' | 'notfound'>('loading');
+  const [quoteResponse, setQuoteResponse] = useState<'accepted' | 'declined' | null>(null);
+  const [quoteResponding, setQuoteResponding] = useState(false);
   
   // Data State
   const [projects, setProjects] = useState<Project[]>([]);
@@ -104,6 +113,12 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Load quote data when ?quote=CODE is in the URL
+  useEffect(() => {
+    if (!quoteCode) { setQuoteData(null); return; }
+    getQuoteByCode(quoteCode).then(q => setQuoteData(q ?? 'notfound')).catch(() => setQuoteData('notfound'));
+  }, [quoteCode]);
+
   // Auto-play testimonial carousel
   useEffect(() => {
     if (testimonials.length === 0) return;
@@ -133,6 +148,119 @@ export default function App() {
         onRefresh={loadData}
         onClose={() => setShowAdmin(false)}
       />
+    );
+  }
+
+  // ── Quote Acceptance Page ─────────────────────────────────────────────────
+  if (quoteCode) {
+    const handleRespond = async (response: 'accepted' | 'declined') => {
+      if (!quoteCode || quoteData === 'loading' || quoteData === 'notfound' || !quoteData) return;
+      setQuoteResponding(true);
+      try {
+        await respondToQuote(quoteCode, response);
+        setQuoteData(prev => (prev && typeof prev === 'object') ? { ...prev, status: response } : prev);
+        setQuoteResponse(response);
+      } catch { /* ignore */ }
+      setQuoteResponding(false);
+    };
+
+    return (
+      <div className="min-h-screen bg-brand-white flex flex-col items-center justify-center px-4 py-16">
+        <div className="w-full max-w-md">
+          {/* Logo */}
+          <div className="flex items-center gap-2 justify-center mb-12">
+            <span className="text-xl font-serif font-medium text-brand-teal uppercase tracking-[0.2em]">LAHZ <span className="text-brand-yellow">●</span></span>
+            <span className="text-[10px] uppercase tracking-widest text-gray-400 font-semibold border-l pl-2 border-gray-200">Productions</span>
+          </div>
+
+          {quoteData === 'loading' && (
+            <div className="flex items-center justify-center h-40">
+              <Loader2 className="w-6 h-6 text-brand-teal animate-spin" />
+            </div>
+          )}
+
+          {quoteData === 'notfound' && (
+            <div className="text-center p-10 border border-gray-100 rounded-sm bg-white shadow-sm">
+              <p className="text-brand-slate font-serif text-xl mb-2">Quote not found</p>
+              <p className="text-gray-400 text-sm">The link may have expired or the code is incorrect.</p>
+              <a href="/" className="mt-6 inline-block text-xs uppercase tracking-widest font-bold text-brand-teal hover:opacity-70">← Back to website</a>
+            </div>
+          )}
+
+          {quoteData && typeof quoteData === 'object' && (
+            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="bg-white border border-gray-100 shadow-xl rounded-sm overflow-hidden">
+              <div className="h-1 bg-brand-teal" />
+              <div className="p-8">
+                <p className="text-xs uppercase tracking-[0.3em] font-bold text-brand-teal mb-1">Your Quote</p>
+                <h2 className="text-2xl font-serif text-brand-slate mb-6">Hi {quoteData.client_name}!</h2>
+
+                <div className="flex flex-col gap-3 mb-6 p-5 bg-gray-50 rounded-sm border border-gray-100">
+                  <div>
+                    <span className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Item</span>
+                    <p className="text-sm text-brand-slate font-medium mt-0.5">{quoteData.item_description}</p>
+                  </div>
+                  {quoteData.quoted_price && (
+                    <div>
+                      <span className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Quoted Price</span>
+                      <p className="text-2xl font-serif text-brand-teal mt-0.5">{quoteData.quoted_price}</p>
+                    </div>
+                  )}
+                  {quoteData.admin_note && (
+                    <div>
+                      <span className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Note from LAHZ</span>
+                      <p className="text-sm text-gray-600 mt-0.5 leading-relaxed">{quoteData.admin_note}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Pending — not priced yet */}
+                {quoteData.status === 'pending' && (
+                  <div className="p-4 bg-amber-50 border border-amber-100 rounded-sm text-center">
+                    <p className="text-sm font-bold text-amber-600">Your quote is being prepared</p>
+                    <p className="text-xs text-amber-500 mt-1">Moulana will WhatsApp you with a price within 48 hours.</p>
+                  </div>
+                )}
+
+                {/* Quoted — awaiting response */}
+                {quoteData.status === 'quoted' && !quoteResponse && (
+                  <div className="flex flex-col gap-3">
+                    <p className="text-sm text-gray-500 text-center mb-2">Would you like to accept this quote?</p>
+                    <button onClick={() => handleRespond('accepted')} disabled={quoteResponding}
+                      className="h-14 w-full bg-brand-teal text-white text-sm font-bold uppercase tracking-widest hover:bg-brand-teal/90 transition-all rounded-sm disabled:opacity-40 flex items-center justify-center gap-2 shadow-lg shadow-brand-teal/20">
+                      {quoteResponding ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                      Yes, Accept Quote
+                    </button>
+                    <button onClick={() => handleRespond('declined')} disabled={quoteResponding}
+                      className="h-12 w-full border border-gray-200 text-sm font-bold uppercase tracking-widest text-gray-400 hover:border-gray-400 transition-all rounded-sm disabled:opacity-40">
+                      Decline
+                    </button>
+                  </div>
+                )}
+
+                {/* Accepted */}
+                {(quoteData.status === 'accepted' || quoteResponse === 'accepted') && (
+                  <div className="text-center p-6 bg-teal-50 border border-teal-100 rounded-sm">
+                    <CheckCircle className="w-8 h-8 text-brand-teal mx-auto mb-3" />
+                    <p className="font-bold text-brand-teal text-lg">Quote Accepted!</p>
+                    <p className="text-sm text-gray-500 mt-2">Moulana will be in touch shortly to arrange collection or delivery.</p>
+                  </div>
+                )}
+
+                {/* Declined */}
+                {(quoteData.status === 'declined' || quoteResponse === 'declined') && (
+                  <div className="text-center p-6 bg-gray-50 border border-gray-200 rounded-sm">
+                    <p className="font-bold text-gray-500">Quote Declined</p>
+                    <p className="text-sm text-gray-400 mt-2">No problem — feel free to reach out if you change your mind.</p>
+                  </div>
+                )}
+              </div>
+              <div className="px-8 pb-6">
+                <a href="/" className="text-xs uppercase tracking-widest font-bold text-gray-300 hover:text-brand-teal transition-all">← Back to website</a>
+              </div>
+            </motion.div>
+          )}
+        </div>
+      </div>
     );
   }
 

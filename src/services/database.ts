@@ -278,3 +278,78 @@ export async function deleteService(id: string): Promise<void> {
   const { error } = await supabase.from('services').delete().eq('id', id);
   if (error) throw error;
 }
+
+// --- Quote Requests ---
+
+export interface QuoteRequest {
+  id: string;
+  quote_code: string;
+  client_name: string;
+  client_phone: string;
+  suburb: string | null;
+  service_category: string | null;
+  item_description: string | null;
+  status: 'pending' | 'quoted' | 'accepted' | 'declined';
+  quoted_price: string | null;
+  admin_note: string | null;
+  created_at: string;
+}
+
+function generateQuoteCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return 'QT-' + Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
+
+export async function saveQuoteRequest(data: {
+  client_name: string;
+  client_phone: string;
+  suburb: string;
+  service_category: string;
+  item_description: string;
+}): Promise<QuoteRequest> {
+  const quote_code = generateQuoteCode();
+  const { data: row, error } = await supabase
+    .from('quote_requests')
+    .insert({ ...data, quote_code })
+    .select()
+    .single();
+  if (error) throw error;
+  return row as QuoteRequest;
+}
+
+export async function fetchQuoteRequests(): Promise<QuoteRequest[]> {
+  const { data, error } = await supabase
+    .from('quote_requests')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data as QuoteRequest[];
+}
+
+export async function getQuoteByCode(code: string): Promise<QuoteRequest | null> {
+  const { data, error } = await supabase
+    .from('quote_requests')
+    .select('*')
+    .eq('quote_code', code)
+    .maybeSingle();
+  if (error) throw error;
+  return data as QuoteRequest | null;
+}
+
+export async function sendQuoteToClient(id: string, quoted_price: string, admin_note: string): Promise<void> {
+  const { error } = await supabase
+    .from('quote_requests')
+    .update({ status: 'quoted', quoted_price, admin_note })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+export async function respondToQuote(quote_code: string, response: 'accepted' | 'declined'): Promise<void> {
+  const { error } = await supabase
+    .from('quote_requests')
+    .update({ status: response })
+    .eq('quote_code', quote_code)
+    .eq('status', 'quoted');
+  if (error) throw error;
+}
+

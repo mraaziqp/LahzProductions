@@ -3,13 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../lib/supabase';
-import { uploadWipPhoto } from '../services/database';
+import { uploadWipPhoto, fetchQuoteRequests, sendQuoteToClient, QuoteRequest } from '../services/database';
 import {
   Plus, Loader2, RefreshCw, Trash2, MessageCircle,
   ChevronDown, Camera, CheckCircle2, X, Check, Copy, Share2, Phone,
+  FileText, Clock, BadgeCheck, XCircle,
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -74,6 +75,7 @@ function generateCode(): string {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function JobManager() {
+  const [activeTab, setActiveTab] = useState<'jobs' | 'quotes'>('jobs');
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -82,6 +84,12 @@ export default function JobManager() {
   const [addOpen, setAddOpen] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  // Quotes tab state
+  const [quotes, setQuotes] = useState<QuoteRequest[]>([]);
+  const [quotesLoading, setQuotesLoading] = useState(false);
+  const [expandedQuoteId, setExpandedQuoteId] = useState<string | null>(null);
+  const [quoteEdits, setQuoteEdits] = useState<Record<string, { price: string; note: string }>>({});
+  const [sendingQuoteId, setSendingQuoteId] = useState<string | null>(null);
   const [form, setForm] = useState<NewJobForm>({
     client_name: '',
     item_description: '',
@@ -101,7 +109,17 @@ export default function JobManager() {
     setLoading(false);
   }, []);
 
+  const loadQuotes = useCallback(async () => {
+    setQuotesLoading(true);
+    try {
+      const data = await fetchQuoteRequests();
+      setQuotes(data);
+    } catch { /* silently ignore */ }
+    setQuotesLoading(false);
+  }, []);
+
   useEffect(() => { fetchJobs(); }, [fetchJobs]);
+  useEffect(() => { if (activeTab === 'quotes') loadQuotes(); }, [activeTab, loadQuotes]);
 
   // ── Expand / edit ────────────────────────────────────────────────────────────
 
@@ -230,13 +248,41 @@ export default function JobManager() {
     }
   };
 
+  // ── Send priced quote to client ──────────────────────────────────────────────
+
+  const handleSendQuote = async (q: QuoteRequest) => {
+    const edit = quoteEdits[q.id];
+    if (!edit?.price.trim()) return;
+    setSendingQuoteId(q.id);
+    try {
+      await sendQuoteToClient(q.id, edit.price.trim(), edit.note.trim());
+      const link = `${window.location.origin}/?quote=${q.quote_code}`;
+      const msg =
+        `Salaam/Hi ${q.client_name}! 🎉 Your quote from LAHZ Productions is ready.\n\n` +
+        `📦 Item: ${q.item_description}\n` +
+        `💰 Price: ${edit.price.trim()}\n` +
+        (edit.note.trim() ? `📝 Note: ${edit.note.trim()}\n` : '') +
+        `\nTap the link below to accept or decline your quote:\n${link}`;
+      if (q.client_phone) {
+        const digits = q.client_phone.replace(/\D/g, '');
+        const waNum = digits.startsWith('0') && digits.length === 10 ? '27' + digits.slice(1) : digits;
+        window.open(`https://wa.me/${waNum}?text=${encodeURIComponent(msg)}`, '_blank');
+      } else {
+        window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+      }
+      setQuotes(prev => prev.map(r => r.id === q.id ? { ...r, status: 'quoted', quoted_price: edit.price.trim(), admin_note: edit.note.trim() } : r));
+      setExpandedQuoteId(null);
+    } catch { /* ignore */ }
+    setSendingQuoteId(null);
+  };
+
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
     <div className="max-w-4xl">
 
       {/* Header */}
-      <header className="mb-10 flex items-start justify-between gap-4 flex-wrap">
+      <header className="mb-8 flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-4xl font-serif text-brand-slate mb-2">Job Manager</h1>
           <p className="text-gray-500 text-sm">
@@ -244,14 +290,36 @@ export default function JobManager() {
           </p>
         </div>
         <div className="flex gap-3">
-          <button onClick={fetchJobs} className="h-11 w-11 flex items-center justify-center border border-gray-200 text-gray-400 hover:text-brand-teal hover:border-brand-teal/40 transition-all rounded-sm" title="Refresh">
+          <button onClick={() => { fetchJobs(); loadQuotes(); }} className="h-11 w-11 flex items-center justify-center border border-gray-200 text-gray-400 hover:text-brand-teal hover:border-brand-teal/40 transition-all rounded-sm" title="Refresh">
             <RefreshCw className="w-4 h-4" />
           </button>
-          <button onClick={() => setAddOpen(true)} className="flex items-center gap-2 h-11 px-6 bg-brand-teal text-white text-xs uppercase tracking-widest font-bold hover:bg-brand-teal/90 transition-all rounded-sm shadow-lg shadow-brand-teal/20">
-            <Plus className="w-4 h-4" /> New Job
-          </button>
+          {activeTab === 'jobs' && (
+            <button onClick={() => setAddOpen(true)} className="flex items-center gap-2 h-11 px-6 bg-brand-teal text-white text-xs uppercase tracking-widest font-bold hover:bg-brand-teal/90 transition-all rounded-sm shadow-lg shadow-brand-teal/20">
+              <Plus className="w-4 h-4" /> New Job
+            </button>
+          )}
         </div>
       </header>
+
+      {/* Tabs */}
+      <div className="flex gap-1 mb-8 p-1 bg-gray-50 rounded-sm w-fit">
+        <button onClick={() => setActiveTab('jobs')}
+          className={`flex items-center gap-2 h-10 px-5 text-xs uppercase tracking-widest font-bold transition-all rounded-sm ${activeTab === 'jobs' ? 'bg-white text-brand-teal shadow-sm' : 'text-gray-400 hover:text-brand-slate'}`}>
+          <CheckCircle2 className="w-3.5 h-3.5" /> Active Jobs
+        </button>
+        <button onClick={() => setActiveTab('quotes')}
+          className={`flex items-center gap-2 h-10 px-5 text-xs uppercase tracking-widest font-bold transition-all rounded-sm ${activeTab === 'quotes' ? 'bg-white text-brand-teal shadow-sm' : 'text-gray-400 hover:text-brand-slate'}`}>
+          <FileText className="w-3.5 h-3.5" /> Quote Requests
+          {quotes.filter(q => q.status === 'pending').length > 0 && (
+            <span className="bg-brand-yellow text-brand-slate text-[9px] font-extrabold rounded-full w-4 h-4 flex items-center justify-center">
+              {quotes.filter(q => q.status === 'pending').length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* ── JOBS TAB ── */}
+      {activeTab === 'jobs' && (<>
 
       {/* How-to banner */}
       <div className="mb-4 p-5 bg-teal-50 border border-brand-teal/20 rounded-sm flex items-start gap-4">
@@ -495,6 +563,150 @@ export default function JobManager() {
           })}
         </div>
       )}
+
+      </>)} {/* end activeTab === 'jobs' */}
+
+      {/* ── QUOTES TAB ── */}
+      {activeTab === 'quotes' && (
+        <div>
+          {quotesLoading ? (
+            <div className="flex items-center justify-center h-40">
+              <Loader2 className="w-5 h-5 text-brand-teal animate-spin" />
+            </div>
+          ) : quotes.length === 0 ? (
+            <div className="border-2 border-dashed border-gray-200 rounded-sm p-16 text-center">
+              <p className="text-xs uppercase tracking-widest font-bold text-gray-300">No quote requests yet</p>
+              <p className="text-gray-300 text-xs mt-2">When a customer fills in the quote form on the website, it will appear here.</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {quotes.map((q, i) => {
+                const isExpanded = expandedQuoteId === q.id;
+                const edit = quoteEdits[q.id] ?? { price: q.quoted_price ?? '', note: q.admin_note ?? '' };
+                const isSending = sendingQuoteId === q.id;
+
+                const statusBadge: Record<QuoteRequest['status'], { label: string; cls: string; icon: React.ReactNode }> = {
+                  pending:  { label: 'Pending',  cls: 'bg-amber-50 text-amber-600',  icon: <Clock className="w-3 h-3" /> },
+                  quoted:   { label: 'Quoted',   cls: 'bg-blue-50 text-blue-600',    icon: <MessageCircle className="w-3 h-3" /> },
+                  accepted: { label: 'Accepted', cls: 'bg-teal-50 text-teal-600',    icon: <BadgeCheck className="w-3 h-3" /> },
+                  declined: { label: 'Declined', cls: 'bg-red-50 text-red-500',      icon: <XCircle className="w-3 h-3" /> },
+                };
+                const badge = statusBadge[q.status];
+
+                return (
+                  <motion.div key={q.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
+                    className="bg-white border border-gray-100 rounded-sm shadow-sm overflow-hidden">
+
+                    {/* Compact row */}
+                    <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-3">
+                      {/* Quote code */}
+                      <span className="font-mono font-bold tracking-[0.15em] text-gray-400 text-xs bg-gray-50 px-3 py-2 rounded-sm flex-shrink-0 w-fit">
+                        {q.quote_code}
+                      </span>
+
+                      {/* Details */}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-sm text-brand-slate truncate">{q.client_name}</p>
+                        <p className="text-xs text-gray-400 truncate mt-0.5">{q.item_description} — {q.suburb}</p>
+                        {q.client_phone && (
+                          <p className="text-[10px] text-gray-300 truncate mt-0.5 font-mono flex items-center gap-1">
+                            <Phone className="w-2.5 h-2.5" />{q.client_phone}
+                          </p>
+                        )}
+                        {q.quoted_price && (
+                          <p className="text-[11px] font-bold text-brand-teal mt-0.5">{q.quoted_price}</p>
+                        )}
+                      </div>
+
+                      {/* Status badge */}
+                      <span className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1 text-[10px] uppercase tracking-widest font-bold rounded-sm flex-shrink-0 ${badge.cls}`}>
+                        {badge.icon} {badge.label}
+                      </span>
+
+                      {/* Expand button */}
+                      <button
+                        onClick={() => {
+                          setExpandedQuoteId(isExpanded ? null : q.id);
+                          if (!quoteEdits[q.id]) setQuoteEdits(prev => ({ ...prev, [q.id]: { price: q.quoted_price ?? '', note: q.admin_note ?? '' } }));
+                        }}
+                        className={`flex items-center gap-1.5 h-9 px-3 text-[10px] uppercase tracking-widest font-bold transition-all rounded-sm border ${isExpanded ? 'bg-brand-slate text-white border-brand-slate' : 'border-gray-200 text-gray-500 hover:border-brand-teal/40 hover:text-brand-teal'}`}>
+                        {isExpanded ? <X className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                        {isExpanded ? 'Close' : (q.status === 'pending' ? 'Send Quote' : 'View')}
+                      </button>
+                    </div>
+
+                    {/* Expandable panel */}
+                    <AnimatePresence>
+                      {isExpanded && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.25 }}
+                          className="overflow-hidden border-t border-gray-100"
+                        >
+                          <div className="p-5 sm:p-6 bg-gray-50/60 flex flex-col gap-4">
+                            {/* Request details summary */}
+                            <div className="grid sm:grid-cols-2 gap-3 p-4 bg-white border border-gray-100 rounded-sm text-sm">
+                              <div><span className="text-[10px] uppercase tracking-widest text-gray-400 font-bold block mb-0.5">Service</span><span className="text-brand-slate font-medium">{q.service_category}</span></div>
+                              <div><span className="text-[10px] uppercase tracking-widest text-gray-400 font-bold block mb-0.5">Item</span><span className="text-brand-slate font-medium">{q.item_description}</span></div>
+                              <div><span className="text-[10px] uppercase tracking-widest text-gray-400 font-bold block mb-0.5">Suburb</span><span className="text-brand-slate font-medium">{q.suburb}</span></div>
+                              <div><span className="text-[10px] uppercase tracking-widest text-gray-400 font-bold block mb-0.5">Received</span><span className="text-brand-slate font-medium">{new Date(q.created_at).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}</span></div>
+                            </div>
+
+                            {/* Price + note fields */}
+                            {(q.status === 'pending' || q.status === 'quoted') && (
+                              <div className="grid sm:grid-cols-2 gap-4">
+                                <div className="flex flex-col gap-2">
+                                  <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Your Price</label>
+                                  <input type="text" placeholder="e.g. R1 200 – R1 500"
+                                    value={edit.price}
+                                    onChange={e => setQuoteEdits(prev => ({ ...prev, [q.id]: { ...prev[q.id], price: e.target.value } }))}
+                                    className="h-11 px-3 border border-gray-200 bg-white rounded-sm text-sm text-brand-slate focus:border-brand-teal outline-none transition-all" />
+                                </div>
+                                <div className="flex flex-col gap-2">
+                                  <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Note to client <span className="normal-case font-normal text-gray-300">(optional)</span></label>
+                                  <input type="text" placeholder="e.g. Includes collection from Maitland"
+                                    value={edit.note}
+                                    onChange={e => setQuoteEdits(prev => ({ ...prev, [q.id]: { ...prev[q.id], note: e.target.value } }))}
+                                    className="h-11 px-3 border border-gray-200 bg-white rounded-sm text-sm text-brand-slate focus:border-brand-teal outline-none transition-all" />
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Accepted/declined response */}
+                            {q.status === 'accepted' && (
+                              <div className="flex items-center gap-3 p-4 bg-teal-50 border border-teal-100 rounded-sm">
+                                <BadgeCheck className="w-5 h-5 text-teal-500 flex-shrink-0" />
+                                <p className="text-sm font-bold text-teal-600">Client accepted this quote.</p>
+                              </div>
+                            )}
+                            {q.status === 'declined' && (
+                              <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-100 rounded-sm">
+                                <XCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+                                <p className="text-sm font-bold text-red-500">Client declined this quote.</p>
+                              </div>
+                            )}
+
+                            {/* Send button */}
+                            {(q.status === 'pending' || q.status === 'quoted') && (
+                              <button onClick={() => handleSendQuote(q)} disabled={!edit.price.trim() || isSending}
+                                className="h-12 w-full bg-green-500 text-white text-xs uppercase tracking-widest font-bold hover:bg-green-600 transition-all rounded-sm disabled:opacity-40 flex items-center justify-center gap-2 shadow-sm shadow-green-500/20">
+                                {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
+                                {isSending ? 'Sending…' : (q.status === 'quoted' ? 'Resend Quote via WhatsApp' : 'Send Quote via WhatsApp')}
+                              </button>
+                            )}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
     </div>
   );
 }
