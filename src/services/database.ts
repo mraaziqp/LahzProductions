@@ -348,6 +348,14 @@ export async function sendQuoteToClient(id: string, quoted_price: string, admin_
   if (error) throw error;
 }
 
+export async function adminDeclineQuote(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('quote_requests')
+    .update({ status: 'declined' })
+    .eq('id', id);
+  if (error) throw error;
+}
+
 export async function respondToQuote(quote_code: string, response: 'accepted' | 'declined'): Promise<void> {
   const { error } = await supabase
     .from('quote_requests')

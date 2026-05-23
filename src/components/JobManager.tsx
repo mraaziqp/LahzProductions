@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../lib/supabase';
-import { uploadWipPhoto, fetchQuoteRequests, sendQuoteToClient, QuoteRequest } from '../services/database';
+import { uploadWipPhoto, fetchQuoteRequests, sendQuoteToClient, adminDeclineQuote, QuoteRequest } from '../services/database';
 import {
   Plus, Loader2, RefreshCw, Trash2, MessageCircle,
   ChevronDown, Camera, CheckCircle2, X, Check, Copy, Share2, Phone,
@@ -96,6 +96,8 @@ export default function JobManager({ initialTab = 'jobs', onQuoteCountChange }: 
   const [expandedQuoteId, setExpandedQuoteId] = useState<string | null>(null);
   const [quoteEdits, setQuoteEdits] = useState<Record<string, { price: string; note: string }>>({});
   const [sendingQuoteId, setSendingQuoteId] = useState<string | null>(null);
+  const [decliningQuoteId, setDecliningQuoteId] = useState<string | null>(null);
+  const [declineConfirmId, setDeclineConfirmId] = useState<string | null>(null);
   const [form, setForm] = useState<NewJobForm>({
     client_name: '',
     item_description: '',
@@ -255,6 +257,34 @@ export default function JobManager({ initialTab = 'jobs', onQuoteCountChange }: 
     msg += `\n\nSee full updates here: ${link}`;
     if (job.client_phone) {
       window.open(`https://wa.me/${toWaNumber(job.client_phone)}?text=${encodeURIComponent(msg)}`, '_blank');
+    } else {
+      window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+    }
+  };
+
+  // ── Decline quote (admin side) ───────────────────────────────────────────────
+
+  const handleDeclineQuote = async (q: QuoteRequest) => {
+    setDeclineConfirmId(null);
+    setDecliningQuoteId(q.id);
+    try {
+      await adminDeclineQuote(q.id);
+      const updated = { ...q, status: 'declined' as QuoteRequest['status'] };
+      setQuotes(prev => prev.map(r => r.id === q.id ? updated : r));
+      onQuoteCountChange?.(quotes.filter(r => r.id !== q.id && r.status === 'pending').length);
+    } catch { /* ignore */ }
+    setDecliningQuoteId(null);
+  };
+
+  const openDeclineNotify = (q: QuoteRequest) => {
+    const msg =
+      `Good day ${q.client_name}, thank you for reaching out to LAHZ Productions. ` +
+      `After careful consideration, we regret to inform you that we are unable to accommodate your request at this time. ` +
+      `We apologise for any inconvenience caused and wish you well.`;
+    if (q.client_phone) {
+      const digits = q.client_phone.replace(/\D/g, '');
+      const waNum = digits.startsWith('0') && digits.length === 10 ? '27' + digits.slice(1) : digits;
+      window.open(`https://wa.me/${waNum}?text=${encodeURIComponent(msg)}`, '_blank');
     } else {
       window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
     }
@@ -703,19 +733,59 @@ export default function JobManager({ initialTab = 'jobs', onQuoteCountChange }: 
                               </div>
                             )}
                             {q.status === 'declined' && (
-                              <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-100 rounded-sm">
-                                <XCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-                                <p className="text-sm font-bold text-red-500">Client declined this quote.</p>
+                              <div className="flex flex-col gap-3 p-4 bg-red-50 border border-red-100 rounded-sm">
+                                <div className="flex items-center gap-3">
+                                  <XCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+                                  <p className="text-sm font-bold text-red-500">This request has been declined.</p>
+                                </div>
+                                <button
+                                  onClick={() => openDeclineNotify(q)}
+                                  className="flex items-center justify-center gap-2 h-10 px-4 border border-red-200 text-red-500 text-[10px] uppercase tracking-widest font-bold hover:bg-red-100 transition-all rounded-sm"
+                                >
+                                  <MessageCircle className="w-3.5 h-3.5" /> Notify Client via WhatsApp (optional)
+                                </button>
                               </div>
                             )}
 
-                            {/* Send button */}
-                            {(q.status === 'pending' || q.status === 'quoted') && (
-                              <button onClick={() => handleSendQuote(q)} disabled={!edit.price.trim() || isSending}
-                                className="h-12 w-full bg-green-500 text-white text-xs uppercase tracking-widest font-bold hover:bg-green-600 transition-all rounded-sm disabled:opacity-40 flex items-center justify-center gap-2 shadow-sm shadow-green-500/20">
-                                {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
-                                {isSending ? 'Sending…' : (q.status === 'quoted' ? 'Resend Quote via WhatsApp' : 'Send Quote via WhatsApp')}
-                              </button>
+                            {/* Inline decline confirmation */}
+                            {declineConfirmId === q.id && (
+                              <div className="flex flex-col gap-3 p-4 bg-red-50 border border-red-200 rounded-sm">
+                                <p className="text-sm font-bold text-red-600">Decline this request?</p>
+                                <p className="text-xs text-red-400">The request will be marked as declined. You can optionally notify the client afterwards.</p>
+                                <div className="flex gap-3">
+                                  <button
+                                    onClick={() => setDeclineConfirmId(null)}
+                                    className="flex-1 h-10 border border-gray-200 text-gray-500 text-[10px] uppercase tracking-widest font-bold hover:border-gray-400 transition-all rounded-sm"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeclineQuote(q)}
+                                    disabled={decliningQuoteId === q.id}
+                                    className="flex-1 h-10 bg-red-500 text-white text-[10px] uppercase tracking-widest font-bold hover:bg-red-600 transition-all rounded-sm disabled:opacity-40 flex items-center justify-center gap-2"
+                                  >
+                                    {decliningQuoteId === q.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
+                                    Confirm Decline
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Send / Decline buttons */}
+                            {(q.status === 'pending' || q.status === 'quoted') && declineConfirmId !== q.id && (
+                              <div className="flex flex-col sm:flex-row gap-3">
+                                <button onClick={() => handleSendQuote(q)} disabled={!edit.price.trim() || isSending}
+                                  className="flex-1 h-12 bg-green-500 text-white text-xs uppercase tracking-widest font-bold hover:bg-green-600 transition-all rounded-sm disabled:opacity-40 flex items-center justify-center gap-2 shadow-sm shadow-green-500/20">
+                                  {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
+                                  {isSending ? 'Sending…' : (q.status === 'quoted' ? 'Resend Quote via WhatsApp' : 'Send Quote via WhatsApp')}
+                                </button>
+                                <button
+                                  onClick={() => setDeclineConfirmId(q.id)}
+                                  className="sm:w-auto h-12 px-5 border border-red-200 text-red-500 text-xs uppercase tracking-widest font-bold hover:bg-red-50 transition-all rounded-sm flex items-center justify-center gap-2"
+                                >
+                                  <XCircle className="w-4 h-4" /> Decline
+                                </button>
+                              </div>
                             )}
                           </div>
                         </motion.div>
