@@ -174,6 +174,7 @@ USING ( bucket_id = 'gallery-images' );
 -- 14. Add Client Portal columns to jobs table
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS wip_image_url TEXT;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS latest_note   TEXT;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS client_phone  TEXT;
 
 -- 15. Upgrade job_status ENUM to 5 production stages
 --     PostgreSQL cannot remove ENUM values, so we recreate the type.

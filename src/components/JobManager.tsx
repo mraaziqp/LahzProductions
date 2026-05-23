@@ -9,7 +9,7 @@ import { supabase } from '../lib/supabase';
 import { uploadWipPhoto } from '../services/database';
 import {
   Plus, Loader2, RefreshCw, Trash2, MessageCircle,
-  ChevronDown, Camera, CheckCircle2, X, Check, Copy, Share2,
+  ChevronDown, Camera, CheckCircle2, X, Check, Copy, Share2, Phone,
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -26,6 +26,7 @@ interface Job {
   tracking_code: string;
   client_name: string;
   item_description: string;
+  client_phone: string | null;
   status: JobStatus;
   wip_image_url: string | null;
   latest_note: string | null;
@@ -42,6 +43,7 @@ interface JobEdit {
 interface NewJobForm {
   client_name: string;
   item_description: string;
+  client_phone: string;
   tracking_code: string;
 }
 
@@ -82,6 +84,7 @@ export default function JobManager() {
   const [form, setForm] = useState<NewJobForm>({
     client_name: '',
     item_description: '',
+    client_phone: '',
     tracking_code: generateCode(),
   });
 
@@ -91,7 +94,7 @@ export default function JobManager() {
     setLoading(true);
     const { data, error } = await supabase
       .from('jobs')
-      .select('id, tracking_code, client_name, item_description, status, wip_image_url, latest_note, created_at')
+      .select('id, tracking_code, client_name, item_description, client_phone, status, wip_image_url, latest_note, created_at')
       .order('created_at', { ascending: false });
     if (!error && data) setJobs(data as Job[]);
     setLoading(false);
@@ -168,11 +171,17 @@ export default function JobManager() {
     setAddLoading(true);
     const { data, error } = await supabase
       .from('jobs')
-      .insert({ tracking_code: form.tracking_code, client_name: form.client_name.trim(), item_description: form.item_description.trim(), status: 'Scheduled' })
+      .insert({
+        tracking_code: form.tracking_code,
+        client_name: form.client_name.trim(),
+        item_description: form.item_description.trim(),
+        client_phone: form.client_phone.trim() || null,
+        status: 'Scheduled',
+      })
       .select().single();
     if (!error && data) {
       setJobs(prev => [data as Job, ...prev]);
-      setForm({ client_name: '', item_description: '', tracking_code: generateCode() });
+      setForm({ client_name: '', item_description: '', client_phone: '', tracking_code: generateCode() });
       setAddOpen(false);
     }
     setAddLoading(false);
@@ -186,12 +195,37 @@ export default function JobManager() {
     setTimeout(() => setCopiedCode(null), 2000);
   };
 
+  // Convert SA local number (0xx) to international format for wa.me URLs
+  const toWaNumber = (phone: string): string => {
+    const digits = phone.replace(/\D/g, '');
+    if (digits.startsWith('0') && digits.length === 10) return '27' + digits.slice(1);
+    return digits;
+  };
+
+  // Send initial tracking link — goes directly to client if phone is saved
   const openWhatsApp = (job: Job) => {
     const link = `${window.location.origin}/?track=${job.tracking_code}#track`;
     const msg =
       `Salaam/Hi ${job.client_name}! Your custom order with LAHZ Productions is in our system. ` +
       `You can track its live progress and see updates here: ${link}`;
-    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+    if (job.client_phone) {
+      window.open(`https://wa.me/${toWaNumber(job.client_phone)}?text=${encodeURIComponent(msg)}`, '_blank');
+    } else {
+      window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+    }
+  };
+
+  // Send a progress update message with current status + note
+  const openWhatsAppUpdate = (job: Job, status: JobStatus, note: string) => {
+    const link = `${window.location.origin}/?track=${job.tracking_code}#track`;
+    let msg = `Salaam/Hi ${job.client_name}! Here's a progress update on your order (Code: ${job.tracking_code}):\n\n📌 Status: ${status}`;
+    if (note.trim()) msg += `\n💬 Note: ${note.trim()}`;
+    msg += `\n\nSee full updates here: ${link}`;
+    if (job.client_phone) {
+      window.open(`https://wa.me/${toWaNumber(job.client_phone)}?text=${encodeURIComponent(msg)}`, '_blank');
+    } else {
+      window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+    }
   };
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -253,7 +287,7 @@ export default function JobManager() {
               className="bg-white w-full max-w-md p-8 shadow-2xl rounded-sm"
             >
               <h2 className="text-2xl font-serif text-brand-slate mb-1">New Job</h2>
-              <p className="text-xs text-gray-400 mb-8">A tracking code is auto-generated. Share it with the client once saved.</p>
+              <p className="text-xs text-gray-400 mb-8">Fill in the client's details. The tracking code is auto-generated — share it with them after saving.</p>
 
               {/* Code preview */}
               <div className="flex items-center gap-3 mb-6 p-4 bg-gray-50 border border-dashed border-gray-200 rounded-sm">
@@ -276,6 +310,16 @@ export default function JobManager() {
                   <input type="text" placeholder="e.g. 3-Seater Grey Couch Restoration" value={form.item_description}
                     onChange={e => setForm(f => ({ ...f, item_description: e.target.value }))}
                     className="h-12 px-4 border border-gray-200 bg-gray-50 focus:bg-white focus:border-brand-teal outline-none transition-all text-sm text-brand-slate rounded-sm" />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400 flex items-center gap-2">
+                    <Phone className="w-3 h-3" /> WhatsApp Number
+                    <span className="normal-case font-normal text-gray-300 tracking-normal">(optional — enables direct send)</span>
+                  </label>
+                  <input type="tel" placeholder="e.g. 0821234567 or 27821234567" value={form.client_phone}
+                    onChange={e => setForm(f => ({ ...f, client_phone: e.target.value }))}
+                    className="h-12 px-4 border border-gray-200 bg-gray-50 focus:bg-white focus:border-brand-teal outline-none transition-all text-sm text-brand-slate rounded-sm font-mono" />
+                  <p className="text-[10px] text-gray-300 leading-relaxed">If you add the number, WhatsApp buttons will open a direct chat with this client. Start with 0 (SA local) or 27 (international). No spaces needed.</p>
                 </div>
               </div>
 
@@ -326,6 +370,11 @@ export default function JobManager() {
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-sm text-brand-slate truncate">{job.client_name}</p>
                     <p className="text-xs text-gray-400 truncate mt-0.5">{job.item_description}</p>
+                    {job.client_phone && (
+                      <p className="text-[10px] text-gray-300 truncate mt-0.5 font-mono flex items-center gap-1">
+                        <Phone className="w-2.5 h-2.5" />{job.client_phone}
+                      </p>
+                    )}
                   </div>
 
                   {/* Status chip (desktop) */}
@@ -416,10 +465,11 @@ export default function JobManager() {
                             {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                             {isSaving ? 'Saving…' : 'Save Update'}
                           </button>
-                          <button onClick={() => openWhatsApp(job)}
+                          <button onClick={() => openWhatsAppUpdate(job, edit.status, edit.note)}
+                            title={job.client_phone ? `Send update directly to ${job.client_phone}` : 'Send update via WhatsApp (pick contact)'}
                             className="sm:w-auto h-12 px-6 bg-green-500 text-white text-xs uppercase tracking-widest font-bold hover:bg-green-600 transition-all rounded-sm flex items-center justify-center gap-2 shadow-lg shadow-green-500/20">
                             <MessageCircle className="w-4 h-4" />
-                            Send to WhatsApp
+                            {job.client_phone ? 'Send Update' : 'Send to WhatsApp'}
                           </button>
                         </div>
 
