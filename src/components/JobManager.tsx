@@ -36,6 +36,7 @@ interface Job {
 interface JobEdit {
   status: JobStatus;
   note: string;
+  phone: string;
   wipFile: File | null;
   wipPreview: string | null;
 }
@@ -110,7 +111,7 @@ export default function JobManager() {
     if (!edits[job.id]) {
       setEdits(prev => ({
         ...prev,
-        [job.id]: { status: job.status, note: job.latest_note ?? '', wipFile: null, wipPreview: null },
+        [job.id]: { status: job.status, note: job.latest_note ?? '', phone: job.client_phone ?? '', wipFile: null, wipPreview: null },
       }));
     }
   };
@@ -140,12 +141,13 @@ export default function JobManager() {
       status: edit.status,
       latest_note: edit.note.trim() || null,
       wip_image_url: wipUrl,
+      client_phone: edit.phone.trim() || null,
     }).eq('id', job.id);
 
     if (!error) {
       setJobs(prev => prev.map(j =>
         j.id === job.id
-          ? { ...j, status: edit.status, latest_note: edit.note.trim() || null, wip_image_url: wipUrl }
+          ? { ...j, status: edit.status, latest_note: edit.note.trim() || null, wip_image_url: wipUrl, client_phone: edit.phone.trim() || null }
           : j
       ));
       setExpandedId(null);
@@ -419,6 +421,16 @@ export default function JobManager() {
                               className="h-11 px-3 border border-gray-200 bg-white rounded-sm text-sm font-bold text-brand-slate focus:border-brand-teal outline-none transition-all">
                               {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                             </select>
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400 flex items-center gap-1.5">
+                              <Phone className="w-3 h-3" /> WhatsApp Number
+                              <span className="normal-case font-normal text-gray-300 tracking-normal">(optional)</span>
+                            </label>
+                            <input type="tel" value={edit.phone}
+                              onChange={e => patchEdit(job.id, { phone: e.target.value })}
+                              placeholder="e.g. 0821234567 or 27821234567"
+                              className="h-11 px-3 border border-gray-200 bg-white rounded-sm text-sm text-brand-slate focus:border-brand-teal outline-none transition-all font-mono placeholder:text-gray-300" />
                           </div>
                           <div className="flex flex-col gap-2">
                             <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">
