@@ -59,6 +59,7 @@ export default function QuoteEstimator() {
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [form, setForm] = useState<FormData>({
     category: null,
     item: "",
@@ -98,13 +99,12 @@ export default function QuoteEstimator() {
   const handleSubmit = async () => {
     if (!form.name.trim() || !form.phone.trim() || !form.suburb.trim()) return;
     setSubmitting(true);
-    // Open WhatsApp regardless of DB result
-    window.open(buildWhatsAppMessage(), "_blank", "noreferrer");
+    setSubmitError(null);
+    const itemDetails =
+      form.category === "Deep Cleaning"
+        ? `${form.size ? form.size + ' ' : ''}${form.item}`
+        : `${form.quantity > 1 ? form.quantity + 'x ' : ''}${form.item}`;
     try {
-      const itemDetails =
-        form.category === "Deep Cleaning"
-          ? `${form.size ? form.size + ' ' : ''}${form.item}`
-          : `${form.quantity > 1 ? form.quantity + 'x ' : ''}${form.item}`;
       await saveQuoteRequest({
         client_name: form.name.trim(),
         client_phone: form.phone.trim(),
@@ -112,11 +112,14 @@ export default function QuoteEstimator() {
         service_category: form.category ?? '',
         item_description: itemDetails,
       });
-    } catch {
-      // DB save failure doesn't block the WhatsApp flow
+      // Open WhatsApp only after successful DB save
+      window.open(buildWhatsAppMessage(), "_blank", "noreferrer");
+      setSubmitted(true);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      setSubmitError(`Could not save your request (${msg}). Please try again or contact us directly on WhatsApp.`);
     } finally {
       setSubmitting(false);
-      setSubmitted(true);
     }
   };
 
@@ -401,6 +404,9 @@ export default function QuoteEstimator() {
                   {submitting ? 'Sending…' : 'Send Quote Request'}
                 </button>
               </div>
+              {submitError && (
+                <p className="mt-4 text-sm text-red-600 text-center">{submitError}</p>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
