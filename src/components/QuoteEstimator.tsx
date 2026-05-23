@@ -146,17 +146,18 @@ export default function QuoteEstimator() {
             <CheckCircle className="w-8 h-8 text-brand-teal" />
           </div>
           <div>
-            <h3 className="text-2xl font-serif text-brand-slate mb-2">Quote request sent!</h3>
+            <h3 className="text-2xl font-serif text-brand-slate mb-2">Request received.</h3>
             <p className="text-sm text-gray-400 max-w-sm leading-relaxed">
-              Moulana will review your request and WhatsApp you a personalised quote within 48 hours.
-              Once you receive it, you'll be able to accept or decline directly from the message.
+              Your quote request has been submitted. We will review the details, assess the work
+              involved, and send you a personalised quote via WhatsApp within 48 hours. You will
+              be able to accept or decline directly from that message.
             </p>
           </div>
           <button
             onClick={() => { setSubmitted(false); setStep(1); setForm({ category: null, item: '', size: '', quantity: 1, name: '', phone: '', suburb: '' }); }}
             className="text-xs uppercase tracking-widest font-bold text-brand-teal hover:opacity-70 transition-all mt-2"
           >
-            Submit another request
+            Submit a new request
           </button>
         </motion.div>
       ) : (
