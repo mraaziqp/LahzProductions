@@ -19,7 +19,8 @@ import {
   ClipboardList,
   X,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  Info
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Project, Service, Testimonial } from '../constants';
@@ -396,10 +397,16 @@ export default function AdminDashboard({
               exit={{ opacity: 0, y: -10 }}
               className="max-w-4xl"
             >
-              <header className="mb-12">
+              <header className="mb-8">
                 <h1 className="text-4xl font-serif text-brand-slate mb-2">Business Overview</h1>
                 <p className="text-gray-500 text-sm">A live snapshot of your content and activity, pulled directly from Supabase.</p>
               </header>
+              <div className="mb-10 p-5 bg-blue-50 border border-blue-100 rounded-sm flex items-start gap-3">
+                <Info className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-blue-700 leading-relaxed">
+                  This page shows a live count of everything on your website. <strong>Projects</strong> are portfolio photos, <strong>Services</strong> are what you offer, and <strong>Reviews</strong> are client testimonials. Nothing on this page can be changed here — use the other tabs to manage content.
+                </p>
+              </div>
               <AnalyticsOverview />
             </motion.div>
           )}
@@ -412,10 +419,17 @@ export default function AdminDashboard({
               exit={{ opacity: 0, y: -10 }}
               className="max-w-4xl"
             >
-              <header className="mb-12">
+              <header className="mb-8">
                 <h1 className="text-4xl font-serif text-brand-slate mb-2">Portfolio Management</h1>
                 <p className="text-gray-500 text-sm">Add high-quality before/after comparisons to your showcase. Everything is synced with Supabase storage.</p>
               </header>
+              <div className="mb-10 p-5 bg-blue-50 border border-blue-100 rounded-sm flex items-start gap-3">
+                <Info className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-blue-700 leading-relaxed">
+                  <p className="mb-2">Photos you add here appear in the <strong>gallery section</strong> of the live website. For most jobs, use <strong>Before / After Slider</strong> — upload a photo before the job and one after, and visitors can drag to compare them.</p>
+                  <p>If you only have one photo, use <strong>Single Photo</strong>, <strong>After Only</strong>, or <strong>Before Only</strong>. Changes go live immediately after clicking <strong>Publish to Gallery</strong>.</p>
+                </div>
+              </div>
 
               {/* Add New Project Form */}
               <div className="bg-white border border-gray-100 p-8 shadow-sm mb-12">
@@ -777,10 +791,17 @@ export default function AdminDashboard({
               exit={{ opacity: 0, y: -10 }}
               className="max-w-4xl"
             >
-              <header className="mb-10">
+              <header className="mb-8">
                 <h1 className="text-4xl font-serif text-brand-slate mb-2">Service Catalog</h1>
                 <p className="text-gray-500 text-sm">Add, edit, or remove services. Changes are live immediately.</p>
               </header>
+              <div className="mb-10 p-5 bg-blue-50 border border-blue-100 rounded-sm flex items-start gap-3">
+                <Info className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-blue-700 leading-relaxed">
+                  <p className="mb-2">Services appear in the <strong>"What We Do"</strong> section of the website. Each service needs a <strong>Title</strong>, a <strong>Category</strong>, and a one-sentence <strong>Description</strong>.</p>
+                  <p><strong>Category meanings:</strong> <em>Restoration</em> = repairing existing items · <em>Manufacturing</em> = building new items · <em>SpecializedCare</em> = specialist treatments like deep cleaning. Clients can filter by these categories on the website.</p>
+                </div>
+              </div>
 
               {/* Add New Service */}
               <div className="bg-white border border-gray-100 p-8 shadow-sm mb-10">
@@ -906,10 +927,16 @@ export default function AdminDashboard({
               exit={{ opacity: 0, y: -10 }}
               className="max-w-4xl"
             >
-              <header className="mb-10">
+              <header className="mb-8">
                 <h1 className="text-4xl font-serif text-brand-slate mb-2">Client Reviews</h1>
                 <p className="text-gray-500 text-sm">Add, edit, or remove testimonials. Shown live on the public site.</p>
               </header>
+              <div className="mb-10 p-5 bg-blue-50 border border-blue-100 rounded-sm flex items-start gap-3">
+                <Info className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-blue-700 leading-relaxed">
+                  Reviews appear in the <strong>testimonials section</strong> of the homepage and rotate automatically. Fill in the client's name, their suburb/city, what service was done, and paste their exact words into the <strong>Review Quote</strong> box. Click <strong>Publish Review</strong> and it goes live immediately.
+                </p>
+              </div>
 
               {/* Add new testimonial */}
               <div className="bg-white border border-gray-100 p-8 shadow-sm mb-10">

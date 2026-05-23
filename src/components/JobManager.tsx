@@ -218,12 +218,21 @@ export default function JobManager() {
       </header>
 
       {/* How-to banner */}
-      <div className="mb-8 p-5 bg-teal-50 border border-brand-teal/20 rounded-sm flex items-start gap-4">
+      <div className="mb-4 p-5 bg-teal-50 border border-brand-teal/20 rounded-sm flex items-start gap-4">
         <Share2 className="w-5 h-5 text-brand-teal flex-shrink-0 mt-0.5" />
         <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-brand-teal mb-1">How to send to a client</p>
+          <p className="text-xs font-bold uppercase tracking-widest text-brand-teal mb-1">How to send a tracking link to a client</p>
           <p className="text-sm text-gray-600 leading-relaxed">
-            Create a job → click <strong className="text-brand-teal">Update</strong> to upload a progress photo and type a note → tap the <strong className="text-green-600">WhatsApp</strong> button to send the client a direct tracking link. They see live status, your photo, and your message — no login needed.
+            Click <strong className="text-brand-teal">New Job</strong> → fill in the client's name and item → <strong className="text-brand-teal">Create Job</strong> → tap the <strong className="text-green-600">WhatsApp button</strong> to send them a direct tracking link. The client does not need to log in — they just click the link to see their job's live status.
+          </p>
+        </div>
+      </div>
+      <div className="mb-8 p-5 bg-amber-50 border border-amber-200/60 rounded-sm flex items-start gap-4">
+        <Camera className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-xs font-bold uppercase tracking-widest text-amber-600 mb-1">How to update progress during the job</p>
+          <p className="text-sm text-gray-600 leading-relaxed">
+            Click anywhere on a job card to expand it → change the <strong className="text-amber-600">Status</strong> to the current stage → (optional) type a <strong className="text-amber-600">note</strong> and upload a <strong className="text-amber-600">progress photo</strong> → click <strong className="text-amber-600">Save Update</strong>. The client's tracking page updates instantly.
           </p>
         </div>
       </div>
