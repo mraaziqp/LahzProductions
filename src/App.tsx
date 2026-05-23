@@ -352,9 +352,7 @@ export default function App() {
               </p>
               <div className="flex flex-col sm:flex-row gap-4 md:gap-5">
                 <a 
-                  href={whatsappUrl}
-                  target="_blank"
-                  rel="noreferrer"
+                  href="#quote"
                   className="h-12 md:h-14 px-10 bg-brand-teal text-white uppercase tracking-[0.2em] text-xs font-bold hover:bg-brand-teal/90 transition-all flex items-center justify-center gap-3 group shadow-xl shadow-brand-teal/20"
                 >
                   {WEBSITE_COPY.hero.ctaPrimary}
@@ -736,9 +734,7 @@ export default function App() {
       {/* Sticky Mobile CTA */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 p-3 bg-white/95 backdrop-blur-md border-t border-gray-100 z-[100] flex gap-3 shadow-2xl">
         <a 
-          href={whatsappUrl}
-          target="_blank"
-          rel="noreferrer"
+          href="#quote"
           className="flex-1 h-12 bg-brand-teal text-white text-[10px] uppercase tracking-[0.2em] font-extrabold flex items-center justify-center gap-2 rounded-sm active:scale-[0.98] transition-all"
         >
           <MessageCircle className="w-4 h-4 fill-current text-brand-yellow" /> Request Quote
