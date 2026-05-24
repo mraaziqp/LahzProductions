@@ -32,6 +32,7 @@ import {
   Project
 } from "./constants";
 import BeforeAfterSlider from "./components/BeforeAfterSlider";
+import GalleryCarousel from "./components/GalleryCarousel";
 import AdminDashboard from "./components/AdminDashboard";
 import AdminAuth from "./components/AdminAuth";
 import QuoteEstimator from "./components/QuoteEstimator";
@@ -595,12 +596,20 @@ export default function App() {
                   viewport={{ once: true }}
                   transition={{ delay: i * 0.1 }}
                 >
-                  <BeforeAfterSlider 
-                    before={project.beforeImage} 
-                    after={project.afterImage} 
-                    title={project.title}
-                    location={project.location}
-                  />
+                  {project.galleryImages && project.galleryImages.length > 1 ? (
+                    <GalleryCarousel
+                      images={project.galleryImages}
+                      title={project.title}
+                      location={project.location}
+                    />
+                  ) : (
+                    <BeforeAfterSlider 
+                      before={project.beforeImage} 
+                      after={project.afterImage} 
+                      title={project.title}
+                      location={project.location}
+                    />
+                  )}
                 </motion.div>
               ))}
             </div>

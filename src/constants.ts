@@ -10,6 +10,7 @@ export interface Project {
   category: "Cleaning" | "Craftsmanship";
   beforeImage: string;
   afterImage: string;
+  galleryImages?: string[];
 }
 
 

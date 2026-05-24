@@ -7,8 +7,8 @@ Follow the steps exactly in order.
 
 Important: the real password is not stored in this codebase, so it cannot be read from here.
 
-Admin Email (username): ________________________________
-Admin Password: _______________________________________
+Admin Email (username): lazreupholstery@gmail.com
+Admin Password: ***REMOVED***
 
 Possible email used in UI placeholder: admin@lahzproductions.com
 

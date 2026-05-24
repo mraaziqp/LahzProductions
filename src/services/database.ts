@@ -24,6 +24,7 @@ export async function fetchProjects(): Promise<Project[]> {
     category: p.category,
     beforeImage: p.before_image_url,
     afterImage: p.after_image_url,
+    galleryImages: p.gallery_images ?? undefined,
   }));
 }
 
@@ -193,6 +194,36 @@ export async function uploadProject(projectData: Partial<Project> & { displayMod
   if (error) {
     throw new Error(`Failed to save project: ${error.message}`);
   }
+}
+
+export async function uploadGalleryProject(projectData: {
+  title?: string;
+  location?: string;
+  category?: string;
+  galleryFiles: File[];
+}): Promise<void> {
+  if (!projectData.title?.trim()) throw new Error('Project title is required');
+  if (!projectData.category) throw new Error('Project category is required');
+  if (projectData.galleryFiles.length < 2) throw new Error('Please add at least 2 photos for a gallery');
+
+  const imageUrls: string[] = [];
+  for (const file of projectData.galleryFiles) {
+    const url = await uploadImage(file, 'gallery');
+    imageUrls.push(url);
+  }
+
+  const { error } = await supabase
+    .from('projects')
+    .insert([{
+      title: projectData.title.trim(),
+      location: projectData.location || 'Not specified',
+      category: projectData.category,
+      before_image_url: imageUrls[0],
+      after_image_url: imageUrls[0],
+      gallery_images: imageUrls,
+    }]);
+
+  if (error) throw new Error(`Failed to save gallery project: ${error.message}`);
 }
 
 export async function updateService(service: Service): Promise<void> {  const { error } = await supabase

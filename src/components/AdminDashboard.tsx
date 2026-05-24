@@ -29,7 +29,7 @@ import {
   uploadProject, deleteProject, validateImageFile,
   addService, updateService, deleteService,
   addTestimonial, updateTestimonial, deleteTestimonial,
-  fetchQuoteRequests,
+  fetchQuoteRequests, uploadGalleryProject,
 } from '../services/database';
 import { supabase } from '../lib/supabase';
 import AnalyticsOverview from './AnalyticsOverview';
@@ -150,7 +150,11 @@ export default function AdminDashboard({
   } as any);
 
   // Upload mode controls how project images are stored and displayed
-  const [uploadMode, setUploadMode] = useState<'beforeAfter' | 'composite' | 'single' | 'beforeOnly' | 'afterOnly'>('beforeAfter');
+  const [uploadMode, setUploadMode] = useState<'beforeAfter' | 'composite' | 'single' | 'beforeOnly' | 'afterOnly' | 'gallery'>('beforeAfter');
+
+  // Gallery mode: multiple images
+  const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
+  const [galleryPreviews, setGalleryPreviews] = useState<string[]>([]);
   const onDropComposite = useCallback(async (acceptedFiles: File[], rejectedFiles: any[]) => {
     setProjectFormErrors((prev: any) => ({ ...prev, compositeImage: '' }));
     
@@ -239,6 +243,24 @@ export default function AdminDashboard({
     onDrop: onDropAfterOnly, accept: { 'image/*': ['.jpg', '.jpeg', '.png', '.webp'] }, multiple: false, disabled: loading
   } as any);
 
+  const onDropGallery = useCallback(async (acceptedFiles: File[], rejectedFiles: any[]) => {
+    if (rejectedFiles.length > 0) {
+      setProjectFormErrors((prev: any) => ({ ...prev, gallery: 'Some files were rejected. Use JPG, PNG, or WebP.' }));
+    }
+    const validFiles = acceptedFiles.filter(f => validateImageFile(f).valid);
+    if (validFiles.length === 0) return;
+    const newPreviews = await Promise.all(validFiles.map(f => createImagePreview(f)));
+    setGalleryFiles((prev: File[]) => [...prev, ...validFiles]);
+    setGalleryPreviews((prev: string[]) => [...prev, ...newPreviews]);
+  }, [createImagePreview]);
+
+  const { getRootProps: getRootPropsGallery, getInputProps: getInputPropsGallery, isDragActive: isDragActiveGallery } = useDropzone({
+    onDrop: onDropGallery,
+    accept: { 'image/*': ['.jpg', '.jpeg', '.png', '.webp'] },
+    multiple: true,
+    disabled: loading,
+  } as any);
+
   const handleAddProject = async () => {
     // Clear previous errors
     setUploadError(null);
@@ -267,6 +289,10 @@ export default function AdminDashboard({
       if (!(newProject as any).afterOnlyImageFile) {
         errors.afterOnlyImage = 'Please upload an after photo';
       }
+    } else if (uploadMode === 'gallery') {
+      if (galleryFiles.length < 2) {
+        errors.gallery = 'Please add at least 2 photos for a gallery slideshow';
+      }
     } else {
       if (!(newProject as any).beforeImageFile) {
         errors.beforeImage = 'Please upload a before image';
@@ -283,6 +309,14 @@ export default function AdminDashboard({
 
     setLoading(true);
     try {
+      if (uploadMode === 'gallery') {
+        await uploadGalleryProject({
+          title: newProject.title,
+          location: newProject.location || 'Not specified',
+          category: newProject.category as any,
+          galleryFiles,
+        });
+      } else {
       const imageFile = uploadMode === 'composite'
         ? (newProject as any).compositeImageFile
         : uploadMode === 'single'
@@ -301,11 +335,14 @@ export default function AdminDashboard({
         afterImage: uploadMode === 'beforeAfter' ? (newProject as any).afterImageFile : imageFile,
         displayMode: uploadMode === 'beforeAfter' ? undefined : uploadMode,
       });
+      }
       
       // Reset form on success
       setNewProject({ category: 'Cleaning' });
       setPreviewUrls({});
       setUploadMode('beforeAfter');
+      setGalleryFiles([]);
+      setGalleryPreviews([]);
       onRefresh();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to upload project';
@@ -320,6 +357,8 @@ export default function AdminDashboard({
     setNewProject((prev: any) => ({ ...prev, beforeImageFile: undefined, afterImageFile: undefined, compositeImageFile: undefined, singleImageFile: undefined, beforeOnlyImageFile: undefined, afterOnlyImageFile: undefined }));
     setPreviewUrls({});
     setProjectFormErrors({});
+    setGalleryFiles([]);
+    setGalleryPreviews([]);
   };
 
   const handleDelete = async (id: string) => {
@@ -445,9 +484,14 @@ export default function AdminDashboard({
               </header>
               <div className="mb-10 p-5 bg-blue-50 border border-blue-100 rounded-sm flex items-start gap-3">
                 <Info className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
-                <div className="text-sm text-blue-700 leading-relaxed">
-                  <p className="mb-2">Photos you add here appear in the <strong>gallery section</strong> of the live website. For most jobs, use <strong>Before / After Slider</strong> — upload a photo before the job and one after, and visitors can drag to compare them.</p>
-                  <p>If you only have one photo, use <strong>Single Photo</strong>, <strong>After Only</strong>, or <strong>Before Only</strong>. Changes go live immediately after clicking <strong>Publish to Gallery</strong>.</p>
+                <div className="text-sm text-blue-700 leading-relaxed space-y-2">
+                  <p>Photos you add here appear in the <strong>gallery section</strong> of the live website. Pick the right mode below for each job, then click <strong>Publish to Gallery</strong> — it goes live instantly.</p>
+                  <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1 mt-2 text-[12px]">
+                    <p><strong>Before / After Slider</strong> — Two photos, drag to compare. Best for most transformations.</p>
+                    <p><strong>Gallery / Slideshow</strong> — 2–10 photos in one card. Clients swipe through like a book. Perfect for grouping multiple jobs or showing a full project in steps.</p>
+                    <p><strong>Featured Photo</strong> — One composite image (before &amp; after already combined). Shows with a gold border.</p>
+                    <p><strong>Single / After Only / Before Only</strong> — One photo when you don't have both sides of the job.</p>
+                  </div>
                 </div>
               </div>
 
@@ -505,6 +549,21 @@ export default function AdminDashboard({
                     onClick={() => { setUploadMode('beforeOnly'); setPreviewUrls(p => ({ ...p, beforeOnlyImage: '' })); setNewProject(p => ({ ...p, beforeImageFile: undefined, afterImageFile: undefined, compositeImageFile: undefined, singleImageFile: undefined, afterOnlyImageFile: undefined })); setProjectFormErrors({}); }}
                     className={`h-9 px-5 text-[10px] uppercase tracking-widest font-bold transition-all rounded-sm ${ uploadMode === 'beforeOnly' ? 'bg-brand-teal text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
                   >Before Only</button>
+                  <button
+                    type="button"
+                    onClick={() => { setUploadMode('gallery'); setGalleryFiles([]); setGalleryPreviews([]); setProjectFormErrors({}); }}
+                    className={`h-9 px-5 text-[10px] uppercase tracking-widest font-bold transition-all rounded-sm ${ uploadMode === 'gallery' ? 'bg-brand-teal text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                  >Gallery / Slideshow</button>
+                </div>
+
+                {/* Per-mode hint */}
+                <div className="mb-6 px-1">
+                  {uploadMode === 'beforeAfter' && <p className="text-xs text-gray-400 leading-relaxed"><span className="font-bold text-brand-teal">Before / After Slider</span> — Upload the photo <em>before</em> the job and the photo <em>after</em>. Clients can drag a handle left and right to compare. This is the most impressive mode for transformations.</p>}
+                  {uploadMode === 'gallery' && <p className="text-xs text-gray-400 leading-relaxed"><span className="font-bold text-brand-teal">Gallery / Slideshow</span> — Add as many photos as you like (minimum 2). Clients tap the arrows or swipe to flip through them like a photo book. Great for grouping all your couch jobs together, or showing a full restoration step by step.</p>}
+                  {uploadMode === 'composite' && <p className="text-xs text-gray-400 leading-relaxed"><span className="font-bold text-brand-teal">Featured Photo</span> — Use this when you already have a single image that shows before &amp; after side by side in one picture. It will be highlighted with a gold border on the website.</p>}
+                  {uploadMode === 'single' && <p className="text-xs text-gray-400 leading-relaxed"><span className="font-bold text-brand-teal">Single Photo</span> — Just one photo, shown as a normal card. Use this when you only have a general photo of the finished job and no before/after pair.</p>}
+                  {uploadMode === 'afterOnly' && <p className="text-xs text-gray-400 leading-relaxed"><span className="font-bold text-brand-teal">After Only</span> — Shows a single photo with a teal "After" badge. Use this when you only have the finished result and no before photo.</p>}
+                  {uploadMode === 'beforeOnly' && <p className="text-xs text-gray-400 leading-relaxed"><span className="font-bold text-brand-teal">Before Only</span> — Shows a single photo with a grey "Before" badge. Use this to show a job that's still in progress or waiting to be done.</p>}
                 </div>
 
                 {/* Error Messages */}
@@ -670,6 +729,62 @@ export default function AdminDashboard({
                       </motion.div>
                     )}
                   </div>
+                ) : uploadMode === 'gallery' ? (
+                  <div className="flex flex-col gap-4 mb-10">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">
+                        Gallery Photos <span className="text-gray-300 normal-case">(min 2 — clients swipe through them)</span>
+                      </label>
+                      {galleryFiles.length > 0 && (
+                        <span className="text-[10px] uppercase tracking-widest font-bold text-brand-teal">{galleryFiles.length} photo{galleryFiles.length !== 1 ? 's' : ''} added</span>
+                      )}
+                    </div>
+
+                    {/* Thumbnail strip of added images */}
+                    {galleryPreviews.length > 0 && (
+                      <div className="flex flex-wrap gap-3">
+                        {galleryPreviews.map((src, idx) => (
+                          <div key={idx} className="relative group/thumb w-24 h-24 rounded-sm overflow-hidden border border-gray-200 shadow-sm flex-shrink-0">
+                            <img src={src} alt={`Gallery photo ${idx + 1}`} className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setGalleryFiles(f => f.filter((_, i) => i !== idx));
+                                setGalleryPreviews(p => p.filter((_, i) => i !== idx));
+                              }}
+                              className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-all shadow"
+                              aria-label="Remove photo"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                            <div className="absolute bottom-0 left-0 right-0 bg-brand-slate/60 text-[8px] text-white text-center py-0.5 font-bold">{idx + 1}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Drop zone to add more */}
+                    <div
+                      {...getRootPropsGallery()}
+                      className={`border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-8 cursor-pointer transition-all ${
+                        isDragActiveGallery ? 'border-brand-teal bg-brand-teal/5' : 'border-gray-200 hover:border-brand-teal/50'
+                      }`}
+                    >
+                      <input {...getInputPropsGallery()} disabled={loading} />
+                      <UploadCloud className="w-10 h-10 text-gray-300 mb-3" />
+                      <span className="text-[10px] uppercase tracking-widest font-bold text-gray-400 mb-1">
+                        {galleryFiles.length === 0 ? 'Drop All Photos Here' : 'Add More Photos'}
+                      </span>
+                      <span className="text-[8px] text-gray-300">Drag & Drop or click to browse — select multiple at once</span>
+                      <span className="text-[8px] text-gray-400 mt-1">JPG, PNG, or WebP • Max 50MB each</span>
+                    </div>
+
+                    {projectFormErrors.gallery && (
+                      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700 flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4" /> {projectFormErrors.gallery}
+                      </motion.div>
+                    )}
+                  </div>
                 ) : (
                 <div className="grid md:grid-cols-2 gap-8 mb-10">
                   <div className="flex flex-col gap-4">
@@ -756,7 +871,7 @@ export default function AdminDashboard({
                 <div className="flex gap-3 mb-8">
                   <button 
                     onClick={handleAddProject}
-                    disabled={!newProject.title || (uploadMode === 'composite' ? !(newProject as any).compositeImageFile : uploadMode === 'single' ? !(newProject as any).singleImageFile : uploadMode === 'afterOnly' ? !(newProject as any).afterOnlyImageFile : uploadMode === 'beforeOnly' ? !(newProject as any).beforeOnlyImageFile : (!(newProject as any).beforeImageFile || !(newProject as any).afterImageFile)) || loading}
+                    disabled={!newProject.title || (uploadMode === 'gallery' ? galleryFiles.length < 2 : uploadMode === 'composite' ? !(newProject as any).compositeImageFile : uploadMode === 'single' ? !(newProject as any).singleImageFile : uploadMode === 'afterOnly' ? !(newProject as any).afterOnlyImageFile : uploadMode === 'beforeOnly' ? !(newProject as any).beforeOnlyImageFile : (!(newProject as any).beforeImageFile || !(newProject as any).afterImageFile)) || loading}
                     className="flex-1 py-5 bg-brand-teal text-white uppercase tracking-[0.2em] text-xs font-bold hover:bg-brand-teal/90 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-3 shadow-xl shadow-brand-teal/20"
                   >
                     {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} 
@@ -764,7 +879,7 @@ export default function AdminDashboard({
                   </button>
                   <button 
                     onClick={handleClearImages}
-                    disabled={!((newProject as any).beforeImageFile || (newProject as any).afterImageFile || (newProject as any).compositeImageFile || (newProject as any).singleImageFile || (newProject as any).beforeOnlyImageFile || (newProject as any).afterOnlyImageFile) || loading}
+                    disabled={!((newProject as any).beforeImageFile || (newProject as any).afterImageFile || (newProject as any).compositeImageFile || (newProject as any).singleImageFile || (newProject as any).beforeOnlyImageFile || (newProject as any).afterOnlyImageFile || galleryFiles.length > 0) || loading}
                     className="px-6 py-5 bg-gray-100 text-gray-600 uppercase tracking-[0.1em] text-xs font-bold hover:bg-gray-200 transition-all disabled:opacity-20 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     <X className="w-4 h-4" /> Clear
@@ -777,12 +892,21 @@ export default function AdminDashboard({
                 <h3 className="text-[10px] uppercase tracking-widest font-bold text-gray-400 mb-4">Current Projects ({projects.length})</h3>
                 {projects.map(project => (
                   <div key={project.id} className="bg-white p-4 border border-gray-100 flex items-center gap-6 group hover:border-brand-teal/20 transition-all">
-                    {project.beforeImage === project.afterImage ? (
-                      <div className="w-32 h-20 bg-gray-100 rounded overflow-hidden border border-brand-yellow/40 shadow-sm">
+                    {project.galleryImages && project.galleryImages.length > 1 ? (
+                      <div className="w-32 h-20 bg-gray-100 rounded overflow-hidden flex gap-0.5 flex-shrink-0 relative">
+                        {project.galleryImages.slice(0, 3).map((src, i) => (
+                          <img key={i} src={src} className="flex-1 h-full object-cover" alt={`Gallery photo ${i + 1}`} />
+                        ))}
+                        <div className="absolute bottom-1 left-1 bg-brand-teal/90 text-white text-[8px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-sm">
+                          {project.galleryImages.length} photos
+                        </div>
+                      </div>
+                    ) : project.beforeImage === project.afterImage ? (
+                      <div className="w-32 h-20 bg-gray-100 rounded overflow-hidden border border-brand-yellow/40 shadow-sm flex-shrink-0">
                         <img src={project.beforeImage} className="w-full h-full object-cover" alt={project.title} />
                       </div>
                     ) : (
-                      <div className="w-32 h-20 bg-gray-100 rounded overflow-hidden flex gap-0.5">
+                      <div className="w-32 h-20 bg-gray-100 rounded overflow-hidden flex gap-0.5 flex-shrink-0">
                         <img src={project.beforeImage} className="w-1/2 h-full object-cover" alt="Before" />
                         <img src={project.afterImage} className="w-1/2 h-full object-cover" alt="After" />
                       </div>

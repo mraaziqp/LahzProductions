@@ -98,6 +98,8 @@ export default function JobManager({ initialTab = 'jobs', onQuoteCountChange }: 
   const [sendingQuoteId, setSendingQuoteId] = useState<string | null>(null);
   const [decliningQuoteId, setDecliningQuoteId] = useState<string | null>(null);
   const [declineConfirmId, setDeclineConfirmId] = useState<string | null>(null);
+  const [convertingQuoteId, setConvertingQuoteId] = useState<string | null>(null);
+  const [convertedQuoteJobs, setConvertedQuoteJobs] = useState<Record<string, string>>({});
   const [form, setForm] = useState<NewJobForm>({
     client_name: '',
     item_description: '',
@@ -260,6 +262,31 @@ export default function JobManager({ initialTab = 'jobs', onQuoteCountChange }: 
     } else {
       window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
     }
+  };
+
+  // ── Convert accepted quote to job ─────────────────────────────────────────────
+
+  const handleConvertToJob = async (q: QuoteRequest) => {
+    setConvertingQuoteId(q.id);
+    const trackingCode = generateCode();
+    const { data, error } = await supabase
+      .from('jobs')
+      .insert({
+        tracking_code: trackingCode,
+        client_name: q.client_name,
+        item_description: q.item_description ?? q.service_category ?? 'Upholstery Job',
+        client_phone: q.client_phone || null,
+        status: 'Scheduled',
+      })
+      .select()
+      .single();
+    if (!error && data) {
+      setJobs(prev => [data as Job, ...prev]);
+      setConvertedQuoteJobs(prev => ({ ...prev, [q.id]: trackingCode }));
+      setExpandedQuoteId(null);
+      setActiveTab('jobs');
+    }
+    setConvertingQuoteId(null);
   };
 
   // ── Decline quote (admin side) ───────────────────────────────────────────────
@@ -727,9 +754,27 @@ export default function JobManager({ initialTab = 'jobs', onQuoteCountChange }: 
 
                             {/* Accepted/declined response */}
                             {q.status === 'accepted' && (
-                              <div className="flex items-center gap-3 p-4 bg-teal-50 border border-teal-100 rounded-sm">
-                                <BadgeCheck className="w-5 h-5 text-teal-500 flex-shrink-0" />
-                                <p className="text-sm font-bold text-teal-600">Client accepted this quote.</p>
+                              <div className="flex flex-col gap-3 p-4 bg-teal-50 border border-teal-100 rounded-sm">
+                                <div className="flex items-center gap-3">
+                                  <BadgeCheck className="w-5 h-5 text-teal-500 flex-shrink-0" />
+                                  <p className="text-sm font-bold text-teal-600">Client accepted this quote.</p>
+                                </div>
+                                {convertedQuoteJobs[q.id] ? (
+                                  <div className="flex items-center gap-3 p-3 bg-white border border-teal-200 rounded-sm">
+                                    <CheckCircle2 className="w-4 h-4 text-teal-500 flex-shrink-0" />
+                                    <span className="text-xs text-teal-700 font-bold">Job created — Tracking code: </span>
+                                    <span className="font-mono font-bold tracking-[0.2em] text-brand-teal text-sm">{convertedQuoteJobs[q.id]}</span>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => handleConvertToJob(q)}
+                                    disabled={convertingQuoteId === q.id}
+                                    className="flex items-center justify-center gap-2 h-11 px-5 bg-brand-teal text-white text-xs uppercase tracking-widest font-bold hover:bg-brand-teal/90 transition-all rounded-sm disabled:opacity-40 shadow-sm shadow-brand-teal/20"
+                                  >
+                                    {convertingQuoteId === q.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                                    {convertingQuoteId === q.id ? 'Creating Job…' : 'Convert to Job'}
+                                  </button>
+                                )}
                               </div>
                             )}
                             {q.status === 'declined' && (
