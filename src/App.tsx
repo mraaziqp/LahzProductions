@@ -63,6 +63,15 @@ export default function App() {
   const [testimonialIndex, setTestimonialIndex] = useState(0);
   const [isAboutExpanded, setIsAboutExpanded] = useState(false);
 
+  useEffect(() => {
+    if (window.location.pathname.includes('launching') ||
+        window.location.pathname.includes('coming') ||
+        window.location.pathname === '/launching-soon' ||
+        window.location.pathname === '/coming-soon') {
+      window.history.replaceState({}, '', '/');
+    }
+  }, []);
+
   // Read pre-filled tracking code from URL ?track=CODE
   const [initialTrackCode] = useState<string | undefined>(() => {
     const params = new URLSearchParams(window.location.search);
