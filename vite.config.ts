@@ -15,9 +15,19 @@ export default defineConfig(({mode}) => {
         '@': path.resolve(__dirname, '.'),
       },
     },
+    build: {
+      chunkSizeWarningLimit: 520,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'admin': ['./src/components/AdminDashboard.tsx', './src/components/AdminAuth.tsx'],
+            'quote': ['./src/components/QuoteEstimator.tsx'],
+            'tracker': ['./src/components/JobTracker.tsx'],
+          }
+        }
+      }
+    },
     server: {
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
     },
   };
