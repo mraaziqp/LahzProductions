@@ -395,13 +395,13 @@ export async function adminDeclineQuote(id: string): Promise<void> {
 }
 
 export async function respondToQuote(code: string, response: 'accepted' | 'declined'): Promise<void> {
-  const { data, error } = await supabase
+  // Count instead of returning the row: visitors can't read every column back.
+  const { count, error } = await supabase
     .from('quote_requests')
-    .update({ status: response })
+    .update({ status: response }, { count: 'exact' })
     .eq('quote_code', code)
     .eq('status', 'quoted')
-    .setHeader(LOOKUP_HEADER, code)
-    .select('status');
+    .setHeader(LOOKUP_HEADER, code);
   if (error) throw error;
-  if (!data?.length) throw new Error('This quote can no longer be changed.');
+  if (!count) throw new Error('This quote can no longer be changed.');
 }
