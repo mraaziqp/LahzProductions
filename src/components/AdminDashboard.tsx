@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import {
   Plus,
@@ -99,6 +99,26 @@ export default function AdminDashboard({
     fetchQuoteRequests()
       .then(qs => setPendingQuoteCount(qs.filter(q => q.status === 'pending').length))
       .catch(() => {});
+  }, []);
+
+  // Sign out after 30 minutes without activity so an unattended screen locks itself.
+  // onClose is read through a ref: the parent re-renders often and must not reset the timer.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  useEffect(() => {
+    const IDLE_MS = 30 * 60 * 1000;
+    const lock = () => onCloseRef.current();
+    let timer = setTimeout(lock, IDLE_MS);
+    const reset = () => {
+      clearTimeout(timer);
+      timer = setTimeout(lock, IDLE_MS);
+    };
+    const events = ['pointerdown', 'keydown', 'scroll', 'touchstart'];
+    events.forEach(e => window.addEventListener(e, reset, { passive: true, capture: true }));
+    return () => {
+      clearTimeout(timer);
+      events.forEach(e => window.removeEventListener(e, reset, { capture: true }));
+    };
   }, []);
 
   useEffect(() => {

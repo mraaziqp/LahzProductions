@@ -150,7 +150,11 @@ export default function App() {
             services={services}
             testimonials={testimonials}
             onRefresh={loadData}
-            onClose={() => setShowAdmin(false)}
+            onClose={() => {
+              // Leaving the dashboard ends the session; Staff Access asks again.
+              supabase.auth.signOut({ scope: 'local' });
+              setShowAdmin(false);
+            }}
           />
         ) : (
           <AdminAuth onLoginSuccess={() => setShowAdmin(true)} onCancel={() => setShowAdmin(false)} />
