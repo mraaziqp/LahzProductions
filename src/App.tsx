@@ -4,17 +4,17 @@
  */
 
 import { motion, AnimatePresence } from "motion/react";
-import { 
-  Sofa, 
-  Settings, 
-  Hammer, 
-  ShieldCheck, 
-  Stethoscope, 
-  Wind, 
+import {
+  Sofa,
+  Settings,
+  Hammer,
+  ShieldCheck,
+  Stethoscope,
+  Wind,
   Car,
   Sun,
   GlassWater,
-  ArrowRight, 
+  ArrowRight,
   CheckCircle,
   Menu,
   X,
@@ -24,21 +24,29 @@ import {
   ChevronDown,
   Phone
 } from "lucide-react";
-import { useState, useEffect } from "react";
-import { 
-  WEBSITE_COPY, 
-  Service, 
+import { useState, useEffect, lazy, Suspense } from "react";
+import type { User } from "@supabase/supabase-js";
+import {
+  WEBSITE_COPY,
+  Service,
   Testimonial,
   Project
 } from "./constants";
 import BeforeAfterSlider from "./components/BeforeAfterSlider";
 import GalleryCarousel from "./components/GalleryCarousel";
-import AdminDashboard from "./components/AdminDashboard";
-import AdminAuth from "./components/AdminAuth";
 import QuoteEstimator from "./components/QuoteEstimator";
 import JobTracker from "./components/JobTracker";
 import { supabase } from "./lib/supabase";
-import { fetchProjects, fetchServices, fetchTestimonials, getQuoteByCode, respondToQuote, QuoteRequest } from "./services/database";
+import { fetchProjects, fetchServices, fetchTestimonials, getQuoteByCode, respondToQuote, QuoteView } from "./services/database";
+
+const AdminDashboard = lazy(() => import("./components/AdminDashboard"));
+const AdminAuth = lazy(() => import("./components/AdminAuth"));
+
+const FullPageSpinner = () => (
+  <div className="min-h-screen bg-brand-white flex items-center justify-center">
+    <Loader2 className="w-8 h-8 text-brand-teal animate-spin" />
+  </div>
+);
 
 const IconMap: { [key: string]: any } = {
   Sofa,
@@ -57,20 +65,12 @@ type ServiceCategory = "Restoration" | "Manufacturing" | "SpecializedCare";
 export default function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeServiceTab, setActiveServiceTab] = useState<ServiceCategory>("Restoration");
   const [testimonialIndex, setTestimonialIndex] = useState(0);
   const [isAboutExpanded, setIsAboutExpanded] = useState(false);
-
-  useEffect(() => {
-    if (window.location.pathname.includes('launching') ||
-        window.location.pathname.includes('coming') ||
-        window.location.pathname === '/launching-soon' ||
-        window.location.pathname === '/coming-soon') {
-      window.history.replaceState({}, '', '/');
-    }
-  }, []);
 
   // Read pre-filled tracking code from URL ?track=CODE
   const [initialTrackCode] = useState<string | undefined>(() => {
@@ -83,10 +83,11 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     return params.get("quote") ?? undefined;
   });
-  const [quoteData, setQuoteData] = useState<QuoteRequest | null | 'loading' | 'notfound'>('loading');
+  const [quoteData, setQuoteData] = useState<QuoteView | null | 'loading' | 'notfound'>('loading');
   const [quoteResponse, setQuoteResponse] = useState<'accepted' | 'declined' | null>(null);
   const [quoteResponding, setQuoteResponding] = useState(false);
-  
+  const [quoteError, setQuoteError] = useState<string | null>(null);
+
   // Data State
   const [projects, setProjects] = useState<Project[]>([]);
   const [services, setServices] = useState<Service[]>([]);
@@ -114,6 +115,7 @@ export default function App() {
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
+      setAuthReady(true);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -138,26 +140,22 @@ export default function App() {
     return () => clearInterval(interval);
   }, [testimonials]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-brand-white flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-brand-teal animate-spin" />
-      </div>
-    );
-  }
-
   if (showAdmin) {
-    if (!user) {
-      return <AdminAuth onLoginSuccess={() => setShowAdmin(true)} />;
-    }
+    if (!authReady) return <FullPageSpinner />;
     return (
-      <AdminDashboard 
-        projects={projects}
-        services={services}
-        testimonials={testimonials}
-        onRefresh={loadData}
-        onClose={() => setShowAdmin(false)}
-      />
+      <Suspense fallback={<FullPageSpinner />}>
+        {user ? (
+          <AdminDashboard
+            projects={projects}
+            services={services}
+            testimonials={testimonials}
+            onRefresh={loadData}
+            onClose={() => setShowAdmin(false)}
+          />
+        ) : (
+          <AdminAuth onLoginSuccess={() => setShowAdmin(true)} onCancel={() => setShowAdmin(false)} />
+        )}
+      </Suspense>
     );
   }
 
@@ -166,11 +164,14 @@ export default function App() {
     const handleRespond = async (response: 'accepted' | 'declined') => {
       if (!quoteCode || quoteData === 'loading' || quoteData === 'notfound' || !quoteData) return;
       setQuoteResponding(true);
+      setQuoteError(null);
       try {
         await respondToQuote(quoteCode, response);
         setQuoteData(prev => (prev && typeof prev === 'object') ? { ...prev, status: response } : prev);
         setQuoteResponse(response);
-      } catch { /* ignore */ }
+      } catch (err) {
+        setQuoteError(err instanceof Error ? err.message : 'Something went wrong. Please try again or contact us on WhatsApp.');
+      }
       setQuoteResponding(false);
     };
 
@@ -227,7 +228,7 @@ export default function App() {
                 {quoteData.status === 'pending' && (
                   <div className="p-4 bg-amber-50 border border-amber-100 rounded-sm text-center">
                     <p className="text-sm font-bold text-amber-600">Your quote is being prepared</p>
-                    <p className="text-xs text-amber-500 mt-1">Moulana will WhatsApp you with a price within 48 hours.</p>
+                    <p className="text-xs text-amber-600 mt-1">Moulana will WhatsApp you with a price within 48 hours.</p>
                   </div>
                 )}
 
@@ -244,6 +245,7 @@ export default function App() {
                       className="h-12 w-full border border-gray-200 text-sm font-bold uppercase tracking-widest text-gray-400 hover:border-gray-400 transition-all rounded-sm disabled:opacity-40">
                       Decline
                     </button>
+                    {quoteError && <p role="alert" className="text-sm text-red-600 text-center">{quoteError}</p>}
                   </div>
                 )}
 
@@ -280,7 +282,8 @@ export default function App() {
     { key: "SpecializedCare", label: "Specialized Care" }
   ];
 
-  const whatsappUrl = `https://wa.me/${WEBSITE_COPY.contact.phone}`;
+  const whatsappUrl = `https://wa.me/${WEBSITE_COPY.contact.phoneIntl}`;
+  const telUrl = `tel:+${WEBSITE_COPY.contact.phoneIntl}`;
   const contactSectionId = "contact";
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(WEBSITE_COPY.contact.location)}`;
 
@@ -299,7 +302,7 @@ export default function App() {
               Productions
             </span>
           </div>
-          
+
           <div className="hidden md:flex items-center gap-10">
             <a href="#services" className="text-sm uppercase tracking-widest hover:text-brand-teal transition-all">Services</a>
             <a href="#about" className="text-sm uppercase tracking-widest hover:text-brand-teal transition-all">Why Us</a>
@@ -319,14 +322,14 @@ export default function App() {
             </button>
           </div>
 
-          <button className="md:hidden h-11 w-11 flex items-center justify-center" onClick={() => setIsMenuOpen(!isMenuOpen)}>
+          <button className="md:hidden h-11 w-11 flex items-center justify-center" onClick={() => setIsMenuOpen(!isMenuOpen)} aria-label={isMenuOpen ? "Close menu" : "Open menu"} aria-expanded={isMenuOpen}>
             {isMenuOpen ? <X /> : <Menu />}
           </button>
         </div>
 
         <AnimatePresence>
           {isMenuOpen && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
@@ -361,14 +364,14 @@ export default function App() {
                 {WEBSITE_COPY.hero.subHeadline}
               </p>
               <div className="flex flex-col sm:flex-row gap-4 md:gap-5">
-                <a 
+                <a
                   href="#quote"
                   className="h-12 md:h-14 px-10 bg-brand-teal text-white uppercase tracking-[0.2em] text-xs font-bold hover:bg-brand-teal/90 transition-all flex items-center justify-center gap-3 group shadow-xl shadow-brand-teal/20"
                 >
                   {WEBSITE_COPY.hero.ctaPrimary}
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </a>
-                <a 
+                <a
                   href="#services"
                   className="h-12 md:h-14 px-10 border border-gray-200 text-brand-slate uppercase tracking-[0.2em] text-xs font-bold hover:bg-gray-50 transition-all bg-white flex items-center justify-center"
                 >
@@ -376,8 +379,8 @@ export default function App() {
                 </a>
               </div>
             </motion.div>
-            
-            <motion.div 
+
+            <motion.div
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 1.2 }}
@@ -401,7 +404,7 @@ export default function App() {
       {/* Job Tracker Section */}
       <section id="track" className="py-20 md:py-28 px-6 bg-gray-50 border-y border-gray-100 scroll-mt-20">
         <div className="max-w-7xl mx-auto">
-          <div className="grid lg:grid-cols-2 gap-16 items-start">
+          <div className="grid lg:grid-cols-2 gap-16 items-start [&>*]:min-w-0">
             <div>
               <span className="text-xs uppercase tracking-[0.4em] text-brand-teal font-extrabold mb-6 block">
                 Live Updates
@@ -411,7 +414,7 @@ export default function App() {
                 <span className="italic text-brand-teal">job progress</span>
               </h2>
               <p className="text-gray-400 text-lg leading-relaxed font-light max-w-md">
-                Enter the tracking code we sent you to see exactly where your item is — from 
+                Enter the tracking code we sent you to see exactly where your item is — from
                 the moment it's booked to the day it's ready for collection.
               </p>
               <div className="mt-8 flex flex-col gap-3">
@@ -424,13 +427,13 @@ export default function App() {
                 ].map(s => (
                   <div key={s.step} className="flex items-center gap-4">
                     <span className="text-xs font-mono font-bold text-brand-teal/40 w-6">{s.step}</span>
-                    <span className="text-sm font-bold text-brand-slate">{s.label}</span>
+                    <span className="text-sm font-bold text-brand-slate whitespace-nowrap">{s.label}</span>
                     <span className="text-xs text-gray-400">— {s.desc}</span>
                   </div>
                 ))}
               </div>
             </div>
-            <div className="bg-white border border-gray-100 p-8 md:p-12 shadow-sm rounded-sm">
+            <div className="bg-white border border-gray-100 p-5 sm:p-8 md:p-12 shadow-sm rounded-sm">
               <JobTracker initialCode={initialTrackCode} />
             </div>
           </div>
@@ -445,9 +448,9 @@ export default function App() {
             <h2 className="text-4xl md:text-6xl font-serif text-brand-slate leading-tight mb-12">
               Bespoke solutions <br className="hidden md:block" /> for every surface
             </h2>
-            
+
             {/* Tabs Trigger - Mobile Scrollable */}
-            <div className="flex overflow-x-auto no-scrollbar gap-2 md:gap-4 mb-12 p-1 bg-gray-50 rounded-lg w-fit md:mx-0 -mx-6 px-6">
+            <div className="flex overflow-x-auto no-scrollbar gap-2 md:gap-4 mb-12 p-1 bg-gray-50 rounded-lg md:w-fit md:mx-0 -mx-6 px-6">
               {categories.map(cat => (
                 <button
                   key={cat.key}
@@ -462,14 +465,22 @@ export default function App() {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-10 min-h-[400px]">
             <AnimatePresence mode="wait">
-              <motion.div 
+              <motion.div
                 key={activeServiceTab}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 className="contents"
               >
-                {filteredServices.map((service, i) => {
+                {loading && Array.from({ length: 3 }, (_, i) => (
+                  <div key={i} className="p-8 md:p-10 border border-gray-100 rounded-sm animate-pulse">
+                    <div className="w-12 h-12 bg-gray-100 mb-6" />
+                    <div className="h-6 w-2/3 bg-gray-100 mb-4" />
+                    <div className="h-4 w-full bg-gray-50 mb-2" />
+                    <div className="h-4 w-4/5 bg-gray-50" />
+                  </div>
+                ))}
+                {filteredServices.map((service) => {
                   const Icon = IconMap[service.iconName] || Sofa;
                   return (
                     <div
@@ -507,17 +518,17 @@ export default function App() {
                   <p className="text-lg md:text-xl text-gray-600 leading-relaxed font-light italic border-l-4 border-brand-yellow pl-6">
                     {WEBSITE_COPY.about.intro}
                   </p>
-                  
+
                   {/* Collapsible Full Story */}
                   <div className="pt-4 border-t border-gray-100">
-                    <button 
+                    <button
                       onClick={() => setIsAboutExpanded(!isAboutExpanded)}
                       className="flex items-center gap-2 text-xs uppercase tracking-widest font-bold text-brand-teal hover:opacity-80 transition-all"
                     >
                       {isAboutExpanded ? "Hide Our Story" : "Read Our Full Story"}
                       <ChevronDown className={`w-4 h-4 transition-transform ${isAboutExpanded ? 'rotate-180' : ''}`} />
                     </button>
-                    
+
                     <AnimatePresence>
                       {isAboutExpanded && (
                         <motion.div
@@ -538,8 +549,8 @@ export default function App() {
                 </div>
               </div>
             </div>
-            
-            <motion.div 
+
+            <motion.div
               initial={{ opacity: 0, x: 20 }}
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
@@ -595,7 +606,11 @@ export default function App() {
               {WEBSITE_COPY.trust.galleryHeadline}
             </h2>
           </div>
-          {projects.length > 0 ? (
+          {loading ? (
+            <div className="grid md:grid-cols-2 gap-10 md:gap-16">
+              {[0, 1].map(i => <div key={i} className="w-full pt-[56.25%] rounded-lg bg-white/5 animate-pulse" />)}
+            </div>
+          ) : projects.length > 0 ? (
             <div className="grid md:grid-cols-2 gap-10 md:gap-16">
               {projects.map((project, i) => (
                 <motion.div
@@ -612,9 +627,9 @@ export default function App() {
                       location={project.location}
                     />
                   ) : (
-                    <BeforeAfterSlider 
-                      before={project.beforeImage} 
-                      after={project.afterImage} 
+                    <BeforeAfterSlider
+                      before={project.beforeImage}
+                      after={project.afterImage}
                       title={project.title}
                       location={project.location}
                     />
@@ -624,8 +639,8 @@ export default function App() {
             </div>
           ) : (
             <div className="text-center py-16 border border-white/10 rounded-sm">
-              <p className="text-white/40 text-sm uppercase tracking-widest font-bold">Portfolio coming soon</p>
-              <p className="text-white/25 text-xs mt-2">Our before &amp; after showcase will appear here once projects are added.</p>
+              <p className="text-white/40 text-sm uppercase tracking-widest font-bold">Portfolio being updated</p>
+              <p className="text-white/40 text-xs mt-2">Ask us on WhatsApp for photos of recent work.</p>
             </div>
           )}
         </div>
@@ -636,7 +651,7 @@ export default function App() {
       <section id="testimonials" className="py-20 md:py-32 px-6 bg-brand-white scroll-mt-20">
         <div className="max-w-4xl mx-auto text-center">
           <span className="text-xs uppercase tracking-[0.4em] text-brand-teal font-extrabold mb-8 block font-sans">The Guild Registry</span>
-          
+
           <div className="relative h-[450px] md:h-[350px] flex items-center justify-center">
             <AnimatePresence mode="wait">
               {testimonials.map((t, index) => index === testimonialIndex && (
@@ -665,6 +680,7 @@ export default function App() {
               <button
                 key={i}
                 onClick={() => setTestimonialIndex(i)}
+                aria-label={`Show review ${i + 1}`}
                 className={`h-1.5 transition-all rounded-full ${i === testimonialIndex ? 'w-8 bg-brand-yellow' : 'w-2 bg-gray-200 hover:bg-gray-300'}`}
               />
             ))}
@@ -676,7 +692,7 @@ export default function App() {
       {/* Quote Estimator Section */}
       <section id="quote" className="py-20 md:py-32 px-6 bg-white border-y border-gray-100 scroll-mt-20">
         <div className="max-w-7xl mx-auto">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
+          <div className="grid lg:grid-cols-2 gap-16 items-center [&>*]:min-w-0">
             <div>
               <span className="text-xs uppercase tracking-[0.4em] text-brand-teal font-extrabold mb-6 block">
                 Quote Request
@@ -707,7 +723,7 @@ export default function App() {
             </div>
             <div className="space-y-4">
               <span className="text-[10px] uppercase tracking-widest font-extrabold text-brand-teal">Direct Line</span>
-              <a href={`tel:${WEBSITE_COPY.contact.phone}`} className="text-sm font-serif text-brand-slate hover:text-brand-teal transition-colors">
+              <a href={telUrl} className="text-sm font-serif text-brand-slate hover:text-brand-teal transition-colors">
                 {WEBSITE_COPY.contact.phone}
               </a>
             </div>
@@ -729,11 +745,10 @@ export default function App() {
                 LAHZ <span className="text-brand-yellow">●</span>
               </span>
             </div>
-            
+
             <div className="flex flex-wrap justify-center gap-8 md:gap-10 text-[10px] uppercase tracking-[0.3em] font-extrabold text-gray-400">
               <a href={whatsappUrl} target="_blank" rel="noreferrer" className="hover:text-brand-teal transition-colors">WhatsApp</a>
-              <a href="#" className="hover:text-brand-teal transition-colors">Instagram</a>
-              <button 
+              <button
                 onClick={() => setShowAdmin(true)}
                 className="flex items-center gap-2 text-gray-300 hover:text-brand-teal transition-colors"
               >
@@ -750,14 +765,14 @@ export default function App() {
 
       {/* Sticky Mobile CTA */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 p-3 bg-white/95 backdrop-blur-md border-t border-gray-100 z-[100] flex gap-3 shadow-2xl">
-        <a 
+        <a
           href="#quote"
           className="flex-1 h-12 bg-brand-teal text-white text-[10px] uppercase tracking-[0.2em] font-extrabold flex items-center justify-center gap-2 rounded-sm active:scale-[0.98] transition-all"
         >
           <MessageCircle className="w-4 h-4 fill-current text-brand-yellow" /> Request Quote
         </a>
-        <a 
-          href={`tel:${WEBSITE_COPY.contact.phone}`}
+        <a
+          href={telUrl}
           className="flex-1 h-12 bg-brand-slate text-white text-[10px] uppercase tracking-[0.2em] font-extrabold flex items-center justify-center gap-2 rounded-sm active:scale-[0.98] transition-all"
         >
           <Phone className="w-4 h-4" /> Call Studio

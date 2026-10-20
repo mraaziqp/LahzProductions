@@ -14,9 +14,10 @@ interface BeforeAfterSliderProps {
 
 export default function BeforeAfterSlider({ before, after, title, location }: BeforeAfterSliderProps) {
   const isSameImage = before === after;
+  // The storage folder records which upload mode was used (see uploadProject)
   const isBeforeOnly = isSameImage && before.includes('/before-only/');
   const isAfterOnly  = isSameImage && before.includes('/after-only/');
-  const isComposite  = isSameImage && !isBeforeOnly && !isAfterOnly;
+  const isComposite  = isSameImage && before.includes('/composite/');
 
   const singleLabel = isBeforeOnly ? 'Before' : isAfterOnly ? 'After' : null;
   
@@ -52,7 +53,6 @@ export default function BeforeAfterSlider({ before, after, title, location }: Be
                   />
                 }
                 className="h-full w-full"
-                position={50}
               />
             )}
             {isComposite && (

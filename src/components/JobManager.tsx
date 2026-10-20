@@ -7,10 +7,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../lib/supabase';
 import { uploadWipPhoto, fetchQuoteRequests, sendQuoteToClient, adminDeclineQuote, QuoteRequest } from '../services/database';
+import { SITE_URL } from '../constants';
+import { reserveTab, waLink } from '../lib/whatsapp';
 import {
   Plus, Loader2, RefreshCw, Trash2, MessageCircle,
   ChevronDown, Camera, CheckCircle2, X, Check, Copy, Share2, Phone,
-  FileText, Clock, BadgeCheck, XCircle,
+  Clock, BadgeCheck, XCircle, AlertCircle,
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -72,16 +74,26 @@ function generateCode(): string {
   return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 }
 
+const QUOTE_BADGE: Record<QuoteRequest['status'], { label: string; cls: string; icon: React.ReactNode }> = {
+  pending:  { label: 'Pending',  cls: 'bg-amber-50 text-amber-600',  icon: <Clock className="w-3 h-3" /> },
+  quoted:   { label: 'Quoted',   cls: 'bg-blue-50 text-blue-600',    icon: <MessageCircle className="w-3 h-3" /> },
+  accepted: { label: 'Accepted', cls: 'bg-teal-50 text-teal-600',    icon: <BadgeCheck className="w-3 h-3" /> },
+  declined: { label: 'Declined', cls: 'bg-red-50 text-red-500',      icon: <XCircle className="w-3 h-3" /> },
+};
+
+const errorText = (err: unknown) => (err instanceof Error ? err.message : (err as { message?: string })?.message) || 'Unknown error';
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 interface JobManagerProps {
-  initialTab?: 'jobs' | 'quotes';
+  tab: 'jobs' | 'quotes';
+  onTabChange: (tab: 'jobs' | 'quotes') => void;
   onQuoteCountChange?: (count: number) => void;
 }
 
-export default function JobManager({ initialTab = 'jobs', onQuoteCountChange }: JobManagerProps) {
-  const [activeTab, setActiveTab] = useState<'jobs' | 'quotes'>(initialTab);
+export default function JobManager({ tab: activeTab, onTabChange, onQuoteCountChange }: JobManagerProps) {
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [edits, setEdits] = useState<Record<string, JobEdit>>({});
@@ -92,6 +104,7 @@ export default function JobManager({ initialTab = 'jobs', onQuoteCountChange }: 
   // Quotes tab state
   const [quotes, setQuotes] = useState<QuoteRequest[]>([]);
   const [quotesLoading, setQuotesLoading] = useState(false);
+  const [quotesLoaded, setQuotesLoaded] = useState(false);
   const [quotesError, setQuotesError] = useState<string | null>(null);
   const [expandedQuoteId, setExpandedQuoteId] = useState<string | null>(null);
   const [quoteEdits, setQuoteEdits] = useState<Record<string, { price: string; note: string }>>({});
@@ -115,7 +128,8 @@ export default function JobManager({ initialTab = 'jobs', onQuoteCountChange }: 
       .from('jobs')
       .select('id, tracking_code, client_name, item_description, client_phone, status, wip_image_url, latest_note, created_at')
       .order('created_at', { ascending: false });
-    if (!error && data) setJobs(data as Job[]);
+    if (error) setError(`Could not load jobs (${error.message}).`);
+    else setJobs(data as Job[]);
     setLoading(false);
   }, []);
 
@@ -123,9 +137,8 @@ export default function JobManager({ initialTab = 'jobs', onQuoteCountChange }: 
     setQuotesLoading(true);
     setQuotesError(null);
     try {
-      const data = await fetchQuoteRequests();
-      setQuotes(data);
-      onQuoteCountChange?.(data.filter(q => q.status === 'pending').length);
+      setQuotes(await fetchQuoteRequests());
+      setQuotesLoaded(true);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
       setQuotesError(`Could not load quote requests (${msg}).`);
@@ -134,8 +147,10 @@ export default function JobManager({ initialTab = 'jobs', onQuoteCountChange }: 
   }, []);
 
   useEffect(() => { fetchJobs(); }, [fetchJobs]);
-  useEffect(() => { loadQuotes(); }, [loadQuotes]);
   useEffect(() => { if (activeTab === 'quotes') loadQuotes(); }, [activeTab, loadQuotes]);
+
+  const pendingCount = quotes.filter(q => q.status === 'pending').length;
+  useEffect(() => { if (quotesLoaded) onQuoteCountChange?.(pendingCount); }, [pendingCount, quotesLoaded, onQuoteCountChange]);
 
   // ── Expand / edit ────────────────────────────────────────────────────────────
 
@@ -165,10 +180,11 @@ export default function JobManager({ initialTab = 'jobs', onQuoteCountChange }: 
     if (!edit) return;
     setSavingId(job.id);
 
+    setError(null);
     let wipUrl = job.wip_image_url;
     if (edit.wipFile) {
       try { wipUrl = await uploadWipPhoto(edit.wipFile, job.id); }
-      catch { setSavingId(null); return; }
+      catch (err) { setError(`Photo upload failed (${errorText(err)}). Nothing was saved.`); setSavingId(null); return; }
     }
 
     const { error } = await supabase.from('jobs').update({
@@ -178,7 +194,9 @@ export default function JobManager({ initialTab = 'jobs', onQuoteCountChange }: 
       client_phone: edit.phone.trim() || null,
     }).eq('id', job.id);
 
-    if (!error) {
+    if (error) {
+      setError(`Could not save the update (${error.message}).`);
+    } else {
       setJobs(prev => prev.map(j =>
         j.id === job.id
           ? { ...j, status: edit.status, latest_note: edit.note.trim() || null, wip_image_url: wipUrl, client_phone: edit.phone.trim() || null }
@@ -194,7 +212,9 @@ export default function JobManager({ initialTab = 'jobs', onQuoteCountChange }: 
   const handleDelete = async (id: string, code: string) => {
     if (!confirm(`Delete job ${code}? This cannot be undone.`)) return;
     const { error } = await supabase.from('jobs').delete().eq('id', id);
-    if (!error) {
+    if (error) {
+      setError(`Could not delete job ${code} (${error.message}).`);
+    } else {
       setJobs(prev => prev.filter(j => j.id !== id));
       if (expandedId === id) setExpandedId(null);
     }
@@ -215,10 +235,15 @@ export default function JobManager({ initialTab = 'jobs', onQuoteCountChange }: 
         status: 'Scheduled',
       })
       .select().single();
-    if (!error && data) {
+    if (error) {
+      setError(error.code === '23505'
+        ? 'That tracking code is already in use — click Regenerate and try again.'
+        : `Could not create the job (${error.message}).`);
+    } else {
       setJobs(prev => [data as Job, ...prev]);
       setForm({ client_name: '', item_description: '', client_phone: '', tracking_code: generateCode() });
       setAddOpen(false);
+      setError(null);
     }
     setAddLoading(false);
   };
@@ -231,37 +256,22 @@ export default function JobManager({ initialTab = 'jobs', onQuoteCountChange }: 
     setTimeout(() => setCopiedCode(null), 2000);
   };
 
-  // Convert SA local number (0xx) to international format for wa.me URLs
-  const toWaNumber = (phone: string): string => {
-    const digits = phone.replace(/\D/g, '');
-    if (digits.startsWith('0') && digits.length === 10) return '27' + digits.slice(1);
-    return digits;
-  };
+  const trackingLink = (code: string) => `${SITE_URL}/?track=${code}#track`;
 
   // Send initial tracking link — goes directly to client if phone is saved
   const openWhatsApp = (job: Job) => {
-    const link = `${window.location.origin}/?track=${job.tracking_code}#track`;
     const msg =
       `Salaam/Hi ${job.client_name}! Your custom order with LAHZ Productions is in our system. ` +
-      `You can track its live progress and see updates here: ${link}`;
-    if (job.client_phone) {
-      window.open(`https://wa.me/${toWaNumber(job.client_phone)}?text=${encodeURIComponent(msg)}`, '_blank');
-    } else {
-      window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
-    }
+      `You can track its live progress and see updates here: ${trackingLink(job.tracking_code)}`;
+    window.open(waLink(msg, job.client_phone), '_blank', 'noreferrer');
   };
 
   // Send a progress update message with current status + note
   const openWhatsAppUpdate = (job: Job, status: JobStatus, note: string) => {
-    const link = `${window.location.origin}/?track=${job.tracking_code}#track`;
     let msg = `Salaam/Hi ${job.client_name}! Here's a progress update on your order (Code: ${job.tracking_code}):\n\n📌 Status: ${status}`;
     if (note.trim()) msg += `\n💬 Note: ${note.trim()}`;
-    msg += `\n\nSee full updates here: ${link}`;
-    if (job.client_phone) {
-      window.open(`https://wa.me/${toWaNumber(job.client_phone)}?text=${encodeURIComponent(msg)}`, '_blank');
-    } else {
-      window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
-    }
+    msg += `\n\nSee full updates here: ${trackingLink(job.tracking_code)}`;
+    window.open(waLink(msg, job.client_phone), '_blank', 'noreferrer');
   };
 
   // ── Convert accepted quote to job ─────────────────────────────────────────────
@@ -280,11 +290,13 @@ export default function JobManager({ initialTab = 'jobs', onQuoteCountChange }: 
       })
       .select()
       .single();
-    if (!error && data) {
+    if (error) {
+      setError(`Could not create a job from this quote (${error.message}).`);
+    } else {
       setJobs(prev => [data as Job, ...prev]);
       setConvertedQuoteJobs(prev => ({ ...prev, [q.id]: trackingCode }));
       setExpandedQuoteId(null);
-      setActiveTab('jobs');
+      onTabChange('jobs');
     }
     setConvertingQuoteId(null);
   };
@@ -296,10 +308,10 @@ export default function JobManager({ initialTab = 'jobs', onQuoteCountChange }: 
     setDecliningQuoteId(q.id);
     try {
       await adminDeclineQuote(q.id);
-      const updated = { ...q, status: 'declined' as QuoteRequest['status'] };
-      setQuotes(prev => prev.map(r => r.id === q.id ? updated : r));
-      onQuoteCountChange?.(quotes.filter(r => r.id !== q.id && r.status === 'pending').length);
-    } catch { /* ignore */ }
+      setQuotes(prev => prev.map(r => r.id === q.id ? { ...r, status: 'declined' } : r));
+    } catch (err) {
+      setError(`Could not decline the quote (${errorText(err)}).`);
+    }
     setDecliningQuoteId(null);
   };
 
@@ -308,13 +320,7 @@ export default function JobManager({ initialTab = 'jobs', onQuoteCountChange }: 
       `Good day ${q.client_name}, thank you for reaching out to LAHZ Productions. ` +
       `After careful consideration, we regret to inform you that we are unable to accommodate your request at this time. ` +
       `We apologise for any inconvenience caused and wish you well.`;
-    if (q.client_phone) {
-      const digits = q.client_phone.replace(/\D/g, '');
-      const waNum = digits.startsWith('0') && digits.length === 10 ? '27' + digits.slice(1) : digits;
-      window.open(`https://wa.me/${waNum}?text=${encodeURIComponent(msg)}`, '_blank');
-    } else {
-      window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
-    }
+    window.open(waLink(msg, q.client_phone), '_blank', 'noreferrer');
   };
 
   // ── Send priced quote to client ──────────────────────────────────────────────
@@ -322,26 +328,26 @@ export default function JobManager({ initialTab = 'jobs', onQuoteCountChange }: 
   const handleSendQuote = async (q: QuoteRequest) => {
     const edit = quoteEdits[q.id];
     if (!edit?.price.trim()) return;
+    const tab = reserveTab();
     setSendingQuoteId(q.id);
+    setError(null);
     try {
       await sendQuoteToClient(q.id, edit.price.trim(), edit.note.trim());
-      const link = `${window.location.origin}/?quote=${q.quote_code}`;
+      const link = `${SITE_URL}/?quote=${q.quote_code}`;
       const msg =
         `Salaam/Hi ${q.client_name}! 🎉 Your quote from LAHZ Productions is ready.\n\n` +
         `📦 Item: ${q.item_description}\n` +
         `💰 Price: ${edit.price.trim()}\n` +
         (edit.note.trim() ? `📝 Note: ${edit.note.trim()}\n` : '') +
         `\nTap the link below to accept or decline your quote:\n${link}`;
-      if (q.client_phone) {
-        const digits = q.client_phone.replace(/\D/g, '');
-        const waNum = digits.startsWith('0') && digits.length === 10 ? '27' + digits.slice(1) : digits;
-        window.open(`https://wa.me/${waNum}?text=${encodeURIComponent(msg)}`, '_blank');
-      } else {
-        window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
-      }
+      const url = waLink(msg, q.client_phone);
+      if (!tab.go(url)) window.location.href = url;
       setQuotes(prev => prev.map(r => r.id === q.id ? { ...r, status: 'quoted', quoted_price: edit.price.trim(), admin_note: edit.note.trim() } : r));
       setExpandedQuoteId(null);
-    } catch { /* ignore */ }
+    } catch (err) {
+      tab.cancel();
+      setError(`Could not save the quote (${errorText(err)}). The client was not messaged.`);
+    }
     setSendingQuoteId(null);
   };
 
@@ -353,13 +359,15 @@ export default function JobManager({ initialTab = 'jobs', onQuoteCountChange }: 
       {/* Header */}
       <header className="mb-8 flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-4xl font-serif text-brand-slate mb-2">Job Manager</h1>
+          <h1 className="text-4xl font-serif text-brand-slate mb-2">{activeTab === 'jobs' ? 'Job Manager' : 'Quote Requests'}</h1>
           <p className="text-gray-500 text-sm">
-            Create jobs, post live progress photos and notes, then share a tracking link with clients.
+            {activeTab === 'jobs'
+              ? 'Create jobs, post live progress photos and notes, then share a tracking link with clients.'
+              : 'Price incoming requests and send them to the client on WhatsApp. Accepted quotes can be turned into jobs.'}
           </p>
         </div>
         <div className="flex gap-3">
-          <button onClick={() => { fetchJobs(); loadQuotes(); }} className="h-11 w-11 flex items-center justify-center border border-gray-200 text-gray-400 hover:text-brand-teal hover:border-brand-teal/40 transition-all rounded-sm" title="Refresh">
+          <button onClick={() => (activeTab === 'jobs' ? fetchJobs() : loadQuotes())} className="h-11 w-11 flex items-center justify-center border border-gray-200 text-gray-400 hover:text-brand-teal hover:border-brand-teal/40 transition-all rounded-sm" title="Refresh" aria-label="Refresh">
             <RefreshCw className="w-4 h-4" />
           </button>
           {activeTab === 'jobs' && (
@@ -370,22 +378,15 @@ export default function JobManager({ initialTab = 'jobs', onQuoteCountChange }: 
         </div>
       </header>
 
-      {/* Tabs */}
-      <div className="flex gap-1 mb-8 p-1 bg-gray-50 rounded-sm w-fit">
-        <button onClick={() => setActiveTab('jobs')}
-          className={`flex items-center gap-2 h-10 px-5 text-xs uppercase tracking-widest font-bold transition-all rounded-sm ${activeTab === 'jobs' ? 'bg-white text-brand-teal shadow-sm' : 'text-gray-400 hover:text-brand-slate'}`}>
-          <CheckCircle2 className="w-3.5 h-3.5" /> Active Jobs
-        </button>
-        <button onClick={() => setActiveTab('quotes')}
-          className={`flex items-center gap-2 h-10 px-5 text-xs uppercase tracking-widest font-bold transition-all rounded-sm ${activeTab === 'quotes' ? 'bg-white text-brand-teal shadow-sm' : 'text-gray-400 hover:text-brand-slate'}`}>
-          <FileText className="w-3.5 h-3.5" /> Quote Requests
-          {quotes.filter(q => q.status === 'pending').length > 0 && (
-            <span className="bg-brand-yellow text-brand-slate text-[9px] font-extrabold rounded-full w-4 h-4 flex items-center justify-center">
-              {quotes.filter(q => q.status === 'pending').length}
-            </span>
-          )}
-        </button>
-      </div>
+      {error && (
+        <div role="alert" className="mb-6 p-4 bg-red-50 border border-red-200 rounded-sm flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+          <p className="flex-1 text-sm text-red-700">{error}</p>
+          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600" aria-label="Dismiss">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* ── JOBS TAB ── */}
       {activeTab === 'jobs' && (<>
@@ -533,7 +534,7 @@ export default function JobManager({ initialTab = 'jobs', onQuoteCountChange }: 
                       {isExpanded ? <X className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                       {isExpanded ? 'Close' : 'Update'}
                     </button>
-                    <button onClick={() => handleDelete(job.id, job.tracking_code)}
+                    <button onClick={() => handleDelete(job.id, job.tracking_code)} aria-label={`Delete job ${job.tracking_code}`}
                       className="h-9 w-9 flex items-center justify-center text-gray-200 hover:text-red-500 border border-transparent hover:border-red-100 hover:bg-red-50 transition-all rounded-sm">
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -665,13 +666,7 @@ export default function JobManager({ initialTab = 'jobs', onQuoteCountChange }: 
                 const edit = quoteEdits[q.id] ?? { price: q.quoted_price ?? '', note: q.admin_note ?? '' };
                 const isSending = sendingQuoteId === q.id;
 
-                const statusBadge: Record<QuoteRequest['status'], { label: string; cls: string; icon: React.ReactNode }> = {
-                  pending:  { label: 'Pending',  cls: 'bg-amber-50 text-amber-600',  icon: <Clock className="w-3 h-3" /> },
-                  quoted:   { label: 'Quoted',   cls: 'bg-blue-50 text-blue-600',    icon: <MessageCircle className="w-3 h-3" /> },
-                  accepted: { label: 'Accepted', cls: 'bg-teal-50 text-teal-600',    icon: <BadgeCheck className="w-3 h-3" /> },
-                  declined: { label: 'Declined', cls: 'bg-red-50 text-red-500',      icon: <XCircle className="w-3 h-3" /> },
-                };
-                const badge = statusBadge[q.status];
+                const badge = QUOTE_BADGE[q.status] ?? QUOTE_BADGE.pending;
 
                 return (
                   <motion.div key={q.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}

@@ -13,6 +13,10 @@ export interface Project {
   galleryImages?: string[];
 }
 
+// Canonical public URL. Vercel redirects the bare domain to www, so every
+// link we hand out (tracking links, quote links) must use this host.
+export const SITE_URL = "https://www.lahzproductions.co.za";
+
 
 export const WEBSITE_COPY = {
   hero: {
@@ -30,7 +34,8 @@ export const WEBSITE_COPY = {
     galleryHeadline: "Technical Precision: Before & After",
   },
   contact: {
-    phone: "0622618608",
+    phone: "062 261 8608",
+    phoneIntl: "27622618608",
     email: "lazreupholstery@gmail.com",
     location: "Maitland, Cape Town",
     hours: "Mon-Fri 8:30 AM - 5:30 PM",

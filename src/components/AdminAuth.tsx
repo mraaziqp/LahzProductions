@@ -8,7 +8,7 @@ import { supabase } from '../lib/supabase';
 import { Lock, Mail, Key, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
 
-export default function AdminAuth({ onLoginSuccess }: { onLoginSuccess: () => void }) {
+export default function AdminAuth({ onLoginSuccess, onCancel }: { onLoginSuccess: () => void; onCancel: () => void }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -34,7 +34,7 @@ export default function AdminAuth({ onLoginSuccess }: { onLoginSuccess: () => vo
 
   return (
     <div className="min-h-screen bg-brand-white flex items-center justify-center p-6">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         className="max-w-md w-full bg-white border border-gray-100 p-10 shadow-2xl"
@@ -50,26 +50,30 @@ export default function AdminAuth({ onLoginSuccess }: { onLoginSuccess: () => vo
 
         <form onSubmit={handleLogin} className="space-y-6">
           <div className="space-y-2">
-            <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Email Address</label>
+            <label htmlFor="admin-email" className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Email Address</label>
             <div className="relative">
               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
-              <input 
-                type="email" 
+              <input
+                id="admin-email"
+                type="email"
+                autoComplete="username"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 focus:bg-white focus:border-brand-teal outline-none transition-all text-sm"
-                placeholder="admin@lahzproductions.com"
+                placeholder="you@example.com"
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Security Key</label>
+            <label htmlFor="admin-password" className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Password</label>
             <div className="relative">
               <Key className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
-              <input 
-                type="password" 
+              <input
+                id="admin-password"
+                type="password"
+                autoComplete="current-password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -80,7 +84,7 @@ export default function AdminAuth({ onLoginSuccess }: { onLoginSuccess: () => vo
           </div>
 
           {error && (
-            <motion.p 
+            <motion.p
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               className="text-xs text-red-500 font-bold text-center"
@@ -89,8 +93,8 @@ export default function AdminAuth({ onLoginSuccess }: { onLoginSuccess: () => vo
             </motion.p>
           )}
 
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             disabled={loading}
             className="w-full py-5 bg-brand-teal text-white uppercase tracking-[0.2em] text-xs font-bold hover:bg-brand-teal/90 transition-all flex items-center justify-center gap-3 shadow-xl shadow-brand-teal/20"
           >
@@ -98,9 +102,13 @@ export default function AdminAuth({ onLoginSuccess }: { onLoginSuccess: () => vo
           </button>
         </form>
 
-        <p className="mt-10 text-center text-[10px] uppercase tracking-widest text-gray-300 font-bold">
-          Technical Environment Secured by Supabase
-        </p>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="mt-8 w-full text-center text-[10px] uppercase tracking-widest text-gray-400 font-bold hover:text-brand-teal transition-colors"
+        >
+          ← Back to website
+        </button>
       </motion.div>
     </div>
   );

@@ -1,20 +1,39 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# LAHZ Productions
 
-# Run and deploy your AI Studio app
+Website for LAHZ Productions, an upholstery and deep cleaning business in Cape Town:
+https://www.lahzproductions.co.za
 
-This contains everything you need to run your app locally.
+React + Vite + Tailwind, with Supabase for data, auth and image storage. Hosted on Vercel.
 
-View your app in AI Studio: https://ai.studio/apps/cc543917-783e-4e61-8d25-3e9cbddb6f29
+## Run locally
 
-## Run Locally
+1. `npm install`
+2. Copy `.env.example` to `.env.local` and fill in the Supabase URL and anon key.
+3. `npm run dev`, then open http://localhost:3000
 
-**Prerequisites:**  Node.js
+`npm run lint` type-checks and `npm run build` builds for production.
 
+## Database
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+Run these in the Supabase SQL Editor, in order, on a new project:
+
+1. `supabase_schema.sql`: tables, policies, storage buckets
+2. `MIGRATION_RUN_IN_SUPABASE.sql`: job tracker columns
+3. `MIGRATION_QUOTES.sql` and `FIX_QUOTE_GRANTS.sql`: quote requests
+4. `MIGRATION_GALLERY.sql`: gallery slideshows
+5. `MIGRATION_SECURITY.sql`: limits logged-out visitors to looking up a single job or quote by its code
+
+## Domains
+
+`www.lahzproductions.co.za` is the primary domain and the bare `lahzproductions.co.za`
+redirects to it. DNS is at GoDaddy and must point only at Vercel:
+
+| Type  | Name | Value                                              |
+|-------|------|----------------------------------------------------|
+| A     | @    | the IP Vercel shows under Project → Settings → Domains |
+| CNAME | www  | the `*.vercel-dns-*.com` target Vercel shows       |
+
+Any other `@` A record (for example GoDaddy's parked or "Website Builder" records)
+makes some visitors land on a GoDaddy "Launching Soon" page.
+
+See `ADMIN_GUIDE.md` for how to use the admin dashboard.

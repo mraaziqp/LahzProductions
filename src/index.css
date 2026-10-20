@@ -1,10 +1,9 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;1,400&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "Playfair Display", serif;
-  
+  --font-serif: "Playfair Display", Georgia, serif;
+
   --color-brand-teal: #0D9488;
   --color-brand-slate: #334155;
   --color-brand-white: #FAFAFA;
@@ -12,36 +11,24 @@
 }
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply bg-brand-white text-brand-slate font-sans antialiased;
   }
 }
 
-/* React Compare Slider Styles */
-@layer components {
-  .react-compare-slider {
-    @apply relative w-full h-full overflow-hidden bg-gray-800;
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
   }
+}
 
-  .react-compare-slider__item {
-    @apply absolute inset-0;
-  }
-
-  .react-compare-slider__item img {
-    @apply w-full h-full object-cover;
-  }
-
-  .react-compare-slider-handle {
-    @apply absolute top-0 bottom-0 w-1 bg-white cursor-col-resize shadow-lg;
-    left: 50%;
-    transform: translateX(-50%);
-  }
-
-  .react-compare-slider-handle::before {
-    @apply absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-full;
-    content: '';
-    width: 50px;
-    height: 50px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
   }
 }

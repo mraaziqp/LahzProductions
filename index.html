@@ -3,20 +3,20 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="Cache-Control" content="public, max-age=0, must-revalidate" />
+    <meta name="theme-color" content="#0D9488" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 
     <!-- Primary SEO -->
     <title>LAHZ Productions | Master Upholstery & Deep Cleaning Cape Town</title>
-    <meta name="description" content="Cape Town's trusted upholstery experts. Furniture restoration, custom manufacturing, couch & car seat re-upholstery, and deep cleaning. 10+ years experience. Call Moualan today." />
-    <meta name="keywords" content="LAHZ Productions, lahz, upholstery Cape Town, furniture restoration Cape Town, couch reupholstery, deep cleaning Cape Town, Moualan, leather repair, custom furniture Cape Town" />
+    <meta name="description" content="Cape Town's trusted upholstery experts. Furniture restoration, custom manufacturing, couch & car seat re-upholstery, and deep cleaning. 10+ years experience. Get a free quote today." />
     <meta name="robots" content="index, follow" />
-    <link rel="canonical" href="https://lahzproductions.co.za/" />
+    <link rel="canonical" href="https://www.lahzproductions.co.za/" />
 
     <!-- Open Graph (Facebook, WhatsApp previews, Google rich results) -->
-    <meta property="og:type" content="business.business" />
+    <meta property="og:type" content="website" />
     <meta property="og:title" content="LAHZ Productions | Master Upholstery & Deep Cleaning Cape Town" />
     <meta property="og:description" content="Cape Town's trusted upholstery experts. Furniture restoration, custom manufacturing, and deep cleaning. 10+ years experience." />
-    <meta property="og:url" content="https://lahzproductions.co.za/" />
+    <meta property="og:url" content="https://www.lahzproductions.co.za/" />
     <meta property="og:locale" content="en_ZA" />
     <meta property="og:site_name" content="LAHZ Productions" />
 
@@ -25,19 +25,25 @@
     <meta name="twitter:title" content="LAHZ Productions | Upholstery & Deep Cleaning Cape Town" />
     <meta name="twitter:description" content="Furniture restoration, custom upholstery, and deep cleaning in Cape Town. 10+ years experience." />
 
+    <!-- Fonts (preconnect so they don't block first paint) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
     <!-- Google: Local Business structured data -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "LocalBusiness",
+      "@type": "HomeAndConstructionBusiness",
       "name": "LAHZ Productions",
       "alternateName": "LAHZ",
       "description": "Master upholstery and deep cleaning services in Cape Town. Specialising in furniture restoration, couch re-upholstery, custom manufacturing, leather repair, and deep cleaning for homes and businesses.",
-      "url": "https://lahzproductions.co.za",
+      "url": "https://www.lahzproductions.co.za/",
       "telephone": "+27622618608",
+      "email": "lazreupholstery@gmail.com",
       "address": {
         "@type": "PostalAddress",
-        "addressLocality": "Cape Town",
+        "addressLocality": "Maitland, Cape Town",
         "addressRegion": "Western Cape",
         "addressCountry": "ZA"
       },
@@ -50,7 +56,7 @@
         },
         "geoRadius": "50000"
       },
-      "serviceType": [
+      "knowsAbout": [
         "Upholstery",
         "Furniture Restoration",
         "Deep Cleaning",
@@ -59,19 +65,23 @@
         "Car Seat Re-upholstery"
       ],
       "priceRange": "$$",
-      "openingHours": "Mo-Fr 08:00-17:00",
-      "sameAs": []
+      "openingHoursSpecification": [{
+        "@type": "OpeningHoursSpecification",
+        "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+        "opens": "08:30",
+        "closes": "17:30"
+      }]
     }
     </script>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <p style="font-family:sans-serif;padding:2rem;text-align:center">
+        LAHZ Productions — master upholstery &amp; deep cleaning in Cape Town.
+        Call or WhatsApp <a href="tel:+27622618608">062 261 8608</a>.
+      </p>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
-    <script>
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/service-worker.js').catch(() => {});
-      }
-    </script>
   </body>
 </html>
-

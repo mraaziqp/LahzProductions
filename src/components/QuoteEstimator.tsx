@@ -7,6 +7,8 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Wind, Sofa, ArrowRight, ArrowLeft, CheckCircle, MessageCircle, Loader2 } from "lucide-react";
 import { saveQuoteRequest } from "../services/database";
+import { WEBSITE_COPY } from "../constants";
+import { isValidPhone, reserveTab, waLink } from "../lib/whatsapp";
 
 type Category = "Deep Cleaning" | "Upholstery/Repair";
 
@@ -47,8 +49,6 @@ interface FormData {
   suburb: string;
 }
 
-const WHATSAPP_NUMBER = "27622618608";
-
 const slideVariants = {
   enter: { x: 60, opacity: 0 },
   center: { x: 0, opacity: 1 },
@@ -60,6 +60,8 @@ export default function QuoteEstimator() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // Set when the browser blocked the WhatsApp tab, so we show a manual link instead.
+  const [fallbackWaUrl, setFallbackWaUrl] = useState<string | null>(null);
   const [form, setForm] = useState<FormData>({
     category: null,
     item: "",
@@ -86,44 +88,47 @@ export default function QuoteEstimator() {
     !!form.item &&
     !(form.category === "Deep Cleaning" && currentCleanItem?.sizes && !form.size);
 
-  const buildWhatsAppMessage = (): string => {
-    const itemDetails =
-      form.category === "Deep Cleaning"
-        ? `${form.size ? form.size + " " : ""}${form.item}`
-        : `${form.quantity > 1 ? form.quantity + "x " : ""}${form.item}`;
+  const itemDetails =
+    form.category === "Deep Cleaning"
+      ? `${form.size ? form.size + " " : ""}${form.item}`
+      : `${form.quantity > 1 ? form.quantity + "x " : ""}${form.item}`;
 
-    const msg = `Hi LAHZ Productions, I'd like a quote for ${form.category} - ${itemDetails} in ${form.suburb}. My name is ${form.name}. Contact: ${form.phone}`;
-    return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`;
+  const phoneValid = isValidPhone(form.phone);
+  const canSubmit = !!(form.name.trim() && phoneValid && form.suburb.trim());
+
+  const buildWhatsAppMessage = (quoteCode: string): string => {
+    const msg =
+      `Hi LAHZ Productions, I'd like a quote for ${form.category} - ${itemDetails} in ${form.suburb.trim()}. ` +
+      `My name is ${form.name.trim()}. Contact: ${form.phone.trim()} (Ref: ${quoteCode})`;
+    return waLink(msg, WEBSITE_COPY.contact.phoneIntl);
   };
 
   const handleSubmit = async () => {
-    if (!form.name.trim() || !form.phone.trim() || !form.suburb.trim()) return;
+    if (!canSubmit) return;
+    // Reserve the WhatsApp tab now, while we are still inside the tap/click.
+    const tab = reserveTab();
     setSubmitting(true);
     setSubmitError(null);
-    const itemDetails =
-      form.category === "Deep Cleaning"
-        ? `${form.size ? form.size + ' ' : ''}${form.item}`
-        : `${form.quantity > 1 ? form.quantity + 'x ' : ''}${form.item}`;
+    setFallbackWaUrl(null);
     try {
-      await saveQuoteRequest({
+      const quoteCode = await saveQuoteRequest({
         client_name: form.name.trim(),
         client_phone: form.phone.trim(),
         suburb: form.suburb.trim(),
         service_category: form.category ?? '',
         item_description: itemDetails,
       });
-      // Open WhatsApp only after successful DB save
-      window.open(buildWhatsAppMessage(), "_blank", "noreferrer");
+      const url = buildWhatsAppMessage(quoteCode);
+      if (!tab.go(url)) setFallbackWaUrl(url);
       setSubmitted(true);
     } catch (err: unknown) {
+      tab.cancel();
       const msg = err instanceof Error ? err.message : 'Unknown error';
       setSubmitError(`Could not save your request (${msg}). Please try again or contact us directly on WhatsApp.`);
     } finally {
       setSubmitting(false);
     }
   };
-
-  const canSubmit = form.name.trim() && form.phone.trim() && form.suburb.trim();
 
   return (
     <div className="bg-white border border-gray-100 shadow-xl rounded-sm overflow-hidden max-w-2xl mx-auto">
@@ -153,8 +158,18 @@ export default function QuoteEstimator() {
               accept or decline directly from that message.
             </p>
           </div>
+          {fallbackWaUrl && (
+            <a
+              href={fallbackWaUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-2 h-12 px-6 bg-green-500 text-white text-xs font-bold uppercase tracking-widest hover:bg-green-600 transition-all rounded-sm"
+            >
+              <MessageCircle className="w-4 h-4" /> Also send on WhatsApp
+            </a>
+          )}
           <button
-            onClick={() => { setSubmitted(false); setStep(1); setForm({ category: null, item: '', size: '', quantity: 1, name: '', phone: '', suburb: '' }); }}
+            onClick={() => { setSubmitted(false); setFallbackWaUrl(null); setStep(1); setForm({ category: null, item: '', size: '', quantity: 1, name: '', phone: '', suburb: '' }); }}
             className="text-xs uppercase tracking-widest font-bold text-brand-teal hover:opacity-70 transition-all mt-2"
           >
             Submit a new request
@@ -163,7 +178,7 @@ export default function QuoteEstimator() {
       ) : (
       <>
       {/* Step indicators */}
-      <div className="flex items-center gap-2 px-8 pt-6">
+      <div className="flex items-center gap-2 px-5 sm:px-8 pt-6">
         {[1, 2, 3].map(s => (
           <div key={s} className="flex items-center gap-2">
             <div
@@ -177,7 +192,7 @@ export default function QuoteEstimator() {
             >
               {step > s ? <CheckCircle className="w-4 h-4" /> : s}
             </div>
-            {s < 3 && <div className={`w-10 h-px transition-all ${step > s ? "bg-brand-teal" : "bg-gray-200"}`} />}
+            {s < 3 && <div className={`w-6 sm:w-10 h-px transition-all ${step > s ? "bg-brand-teal" : "bg-gray-200"}`} />}
           </div>
         ))}
         <span className="ml-auto text-[10px] uppercase tracking-widest text-gray-400 font-bold">
@@ -185,7 +200,7 @@ export default function QuoteEstimator() {
         </span>
       </div>
 
-      <div className="p-8 min-h-[320px]">
+      <div className="p-5 sm:p-8 min-h-[320px]">
         <AnimatePresence mode="wait">
           {/* ─── Step 1: Category ─── */}
           {step === 1 && (
@@ -323,17 +338,17 @@ export default function QuoteEstimator() {
                 </motion.div>
               )}
 
-              <div className="flex justify-between mt-8">
+              <div className="flex justify-between gap-3 mt-8">
                 <button
                   onClick={() => setStep(1)}
-                  className="flex items-center gap-2 h-14 px-6 border border-gray-200 text-sm font-bold uppercase tracking-widest text-gray-400 hover:border-gray-400 transition-all rounded-sm"
+                  className="flex items-center gap-2 h-14 px-4 sm:px-6 border border-gray-200 text-sm font-bold uppercase tracking-widest text-gray-400 hover:border-gray-400 transition-all rounded-sm"
                 >
                   <ArrowLeft className="w-4 h-4" /> Back
                 </button>
                 <button
                   onClick={() => canProceedToStep3 && setStep(3)}
                   disabled={!canProceedToStep3}
-                  className="flex items-center gap-2 h-14 px-8 bg-brand-teal text-white text-sm font-bold uppercase tracking-widest hover:bg-brand-teal/90 transition-all rounded-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 h-14 px-5 sm:px-8 bg-brand-teal text-white text-sm font-bold uppercase tracking-widest hover:bg-brand-teal/90 transition-all rounded-sm disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Continue <ArrowRight className="w-4 h-4" />
                 </button>
@@ -359,47 +374,58 @@ export default function QuoteEstimator() {
               <div className="flex flex-col gap-5">
                 {(
                   [
-                    { label: "Full Name", field: "name", type: "text", placeholder: "e.g. John Smith" },
+                    { label: "Full Name", field: "name", type: "text", placeholder: "e.g. John Smith", autoComplete: "name" },
                     {
-                      label: "Phone Number",
+                      label: "WhatsApp Number",
                       field: "phone",
                       type: "tel",
                       placeholder: "e.g. 072 345 6789",
+                      autoComplete: "tel",
                     },
                     {
                       label: "Suburb",
                       field: "suburb",
                       type: "text",
                       placeholder: "e.g. Maitland, Cape Town",
+                      autoComplete: "address-level2",
                     },
                   ] as const
-                ).map(({ label, field, type, placeholder }) => (
-                  <div key={field} className="flex flex-col gap-2">
-                    <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">
-                      {label}
-                    </label>
-                    <input
-                      type={type}
-                      placeholder={placeholder}
-                      value={form[field]}
-                      onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
-                      className="h-14 px-4 border border-gray-200 bg-gray-50 focus:bg-white focus:border-brand-teal outline-none transition-all text-sm text-brand-slate rounded-sm"
-                    />
-                  </div>
-                ))}
+                ).map(({ label, field, type, placeholder, autoComplete }) => {
+                  const showPhoneError = field === "phone" && form.phone.trim() !== "" && !phoneValid;
+                  return (
+                    <div key={field} className="flex flex-col gap-2">
+                      <label htmlFor={`quote-${field}`} className="text-[10px] uppercase tracking-widest font-bold text-gray-400">
+                        {label}
+                      </label>
+                      <input
+                        id={`quote-${field}`}
+                        type={type}
+                        placeholder={placeholder}
+                        autoComplete={autoComplete}
+                        value={form[field]}
+                        onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
+                        aria-invalid={showPhoneError}
+                        className={`h-14 px-4 border bg-gray-50 focus:bg-white outline-none transition-all text-base sm:text-sm text-brand-slate rounded-sm ${showPhoneError ? "border-red-300 focus:border-red-400" : "border-gray-200 focus:border-brand-teal"}`}
+                      />
+                      {showPhoneError && (
+                        <p className="text-xs text-red-500">Please enter a valid phone number, e.g. 072 345 6789.</p>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
 
-              <div className="flex justify-between mt-8">
+              <div className="flex justify-between gap-3 mt-8">
                 <button
                   onClick={() => setStep(2)}
-                  className="flex items-center gap-2 h-14 px-6 border border-gray-200 text-sm font-bold uppercase tracking-widest text-gray-400 hover:border-gray-400 transition-all rounded-sm"
+                  className="flex items-center gap-2 h-14 px-4 sm:px-6 border border-gray-200 text-sm font-bold uppercase tracking-widest text-gray-400 hover:border-gray-400 transition-all rounded-sm"
                 >
                   <ArrowLeft className="w-4 h-4" /> Back
                 </button>
                 <button
                   onClick={handleSubmit}
                   disabled={!canSubmit || submitting}
-                  className="flex items-center gap-3 h-14 px-10 bg-brand-teal text-white text-sm font-bold uppercase tracking-widest hover:bg-brand-teal/90 transition-all rounded-sm shadow-xl shadow-brand-teal/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex items-center gap-3 h-14 px-5 sm:px-10 bg-brand-teal text-white text-sm font-bold uppercase tracking-widest hover:bg-brand-teal/90 transition-all rounded-sm shadow-xl shadow-brand-teal/20 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <MessageCircle className="w-5 h-5 fill-current text-brand-yellow" />}
                   {submitting ? 'Sending…' : 'Send Quote Request'}

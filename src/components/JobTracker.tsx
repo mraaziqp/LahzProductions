@@ -6,7 +6,7 @@
 import { useState, useEffect, Fragment } from 'react';
 import type { FC } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { supabase } from '../lib/supabase';
+import { trackJob, TrackedJob } from '../services/database';
 import {
   Search, CheckCircle2, Loader2,
   Clock, Scissors, Wrench, ShieldCheck, PackageCheck,
@@ -21,15 +21,6 @@ type JobStatus =
   | 'Quality Check'
   | 'Ready for Delivery';
 
-interface Job {
-  id: string;
-  tracking_code: string;
-  client_name: string;
-  item_description: string;
-  status: JobStatus;
-  wip_image_url: string | null;
-  latest_note: string | null;
-}
 
 interface Step {
   value: JobStatus;
@@ -51,13 +42,8 @@ const STEPS: Step[] = [
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function JobTracker({ initialCode }: { initialCode?: string }) {
-  // Read code from URL param as a self-contained fallback
-  const urlCode = typeof window !== 'undefined'
-    ? (new URLSearchParams(window.location.search).get('track') ?? undefined)
-    : undefined;
-
-  const [code, setCode] = useState((initialCode ?? urlCode)?.toUpperCase() ?? '');
-  const [job, setJob] = useState<Job | null>(null);
+  const [code, setCode] = useState(initialCode?.toUpperCase() ?? '');
+  const [job, setJob] = useState<TrackedJob | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -68,23 +54,19 @@ export default function JobTracker({ initialCode }: { initialCode?: string }) {
     setError(null);
     setJob(null);
 
-    const { data, error: dbError } = await supabase
-      .from('jobs')
-      .select('id, tracking_code, client_name, item_description, status, wip_image_url, latest_note')
-      .eq('tracking_code', trimmed)
-      .single();
-
-    if (dbError || !data) {
-      setError('No job found with that tracking code. Please double-check and try again.');
-    } else {
-      setJob(data as Job);
+    try {
+      const found = await trackJob(trimmed);
+      if (found) setJob(found);
+      else setError('No job found with that tracking code. Please double-check and try again.');
+    } catch {
+      setError('We could not reach the tracking service. Please check your connection and try again.');
     }
     setLoading(false);
   };
 
   // Auto-search on mount when a code is pre-supplied
   useEffect(() => {
-    const initial = (initialCode ?? urlCode)?.trim().toUpperCase();
+    const initial = initialCode?.trim().toUpperCase();
     if (initial) handleTrack(initial);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -100,16 +82,19 @@ export default function JobTracker({ initialCode }: { initialCode?: string }) {
         <input
           type="text"
           maxLength={10}
+          aria-label="Tracking code"
+          autoComplete="off"
           placeholder="Enter your tracking code"
           value={code}
           onChange={e => setCode(e.target.value.toUpperCase())}
           onKeyDown={e => e.key === 'Enter' && !loading && handleTrack()}
-          className="flex-1 h-14 px-5 border-2 border-gray-200 bg-white focus:border-brand-teal outline-none transition-all text-sm font-mono font-bold tracking-[0.25em] text-brand-slate placeholder:font-normal placeholder:tracking-normal placeholder:text-gray-400 rounded-sm"
+          className="flex-1 min-w-0 h-14 px-5 border-2 border-gray-200 bg-white focus:border-brand-teal outline-none transition-all text-sm font-mono font-bold tracking-[0.25em] text-brand-slate placeholder:font-normal placeholder:tracking-normal placeholder:text-gray-400 rounded-sm"
         />
         <button
           onClick={() => handleTrack()}
           disabled={loading || !code.trim()}
-          className="h-14 px-8 bg-brand-teal text-white font-bold uppercase tracking-widest text-xs hover:bg-brand-teal/90 transition-all rounded-sm disabled:opacity-40 shadow-lg shadow-brand-teal/20 flex items-center justify-center"
+          aria-label="Track job"
+          className="h-14 px-6 sm:px-8 flex-shrink-0 bg-brand-teal text-white font-bold uppercase tracking-widest text-xs hover:bg-brand-teal/90 transition-all rounded-sm disabled:opacity-40 shadow-lg shadow-brand-teal/20 flex items-center justify-center"
         >
           {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
         </button>

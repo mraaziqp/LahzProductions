@@ -3,14 +3,11 @@
 This guide is for someone who is not technical.
 Follow the steps exactly in order.
 
-## 1. Login Details (Fill This In Once)
-
-Important: the real password is not stored in this codebase, so it cannot be read from here.
+## 1. Login Details
 
 Admin Email (username): lazreupholstery@gmail.com
-Admin Password: ***REMOVED***
-
-Possible email used in UI placeholder: admin@lahzproductions.com
+Admin Password: keep it in a password manager. Never write it in this file,
+because this code is stored on GitHub where other people can read it.
 
 If password is forgotten:
 1. Open Supabase dashboard.
@@ -19,7 +16,7 @@ If password is forgotten:
 
 ## 2. How To Open Admin
 
-1. Open the website.
+1. Open the website: https://www.lahzproductions.co.za
 2. Scroll to the bottom.
 3. Click the lock icon (Admin).
 4. Type admin email and password.

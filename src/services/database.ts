@@ -15,7 +15,7 @@ export async function fetchProjects(): Promise<Project[]> {
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-  
+
   // Map snake_case to camelCase
   return data.map((p: any) => ({
     id: p.id,
@@ -35,7 +35,7 @@ export async function fetchServices(): Promise<Service[]> {
     .order('created_at', { ascending: true });
 
   if (error) throw error;
-  
+
   return data.map((s: any) => ({
     id: s.id,
     title: s.title,
@@ -52,7 +52,7 @@ export async function fetchTestimonials(): Promise<Testimonial[]> {
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-  
+
   return data.map((t: any) => ({
     id: t.id,
     clientName: t.client_name,
@@ -87,39 +87,18 @@ export function validateImageFile(file: File): { valid: boolean; error?: string 
   return { valid: true };
 }
 
-async function uploadImage(file: string | File, path: string): Promise<string> {
-  // If it's already a URL, return it
-  if (typeof file === 'string' && file.startsWith('http')) return file;
-
-  // Validate file if it's a File object
-  if (file instanceof File) {
-    const validation = validateImageFile(file);
-    if (!validation.valid) {
-      throw new Error(validation.error || 'Image validation failed');
-    }
+async function uploadImage(file: File, path: string): Promise<string> {
+  const validation = validateImageFile(file);
+  if (!validation.valid) {
+    throw new Error(validation.error || 'Image validation failed');
   }
 
-  // Convert base64/dataURL to blob if necessary
-  let blob: Blob;
-  if (typeof file === 'string') {
-    const response = await fetch(file);
-    if (!response.ok) throw new Error('Failed to fetch image data');
-    blob = await response.blob();
-  } else {
-    blob = file;
-  }
-
-  // Verify blob size
-  if (blob.size > MAX_FILE_SIZE) {
-    throw new Error(`Image is too large. Maximum size is ${MAX_FILE_SIZE / 1024 / 1024}MB`);
-  }
-
-  const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
-  const fullPath = `${path}/${fileName}`;
+  const ext = file.type === 'image/jpeg' ? 'jpg' : file.type.split('/')[1];
+  const fullPath = `${path}/${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${ext}`;
 
   const { error: uploadError } = await supabase.storage
     .from('gallery-images')
-    .upload(fullPath, blob);
+    .upload(fullPath, file, { contentType: file.type });
 
   if (uploadError) {
     throw new Error(`Upload failed: ${uploadError.message}`);
@@ -132,52 +111,49 @@ async function uploadImage(file: string | File, path: string): Promise<string> {
   return data.publicUrl;
 }
 
-export async function uploadProject(projectData: Partial<Project> & { displayMode?: string }): Promise<void> {
-  // Validate before and after images exist
-  if (!projectData.beforeImage || !projectData.afterImage) {
-    throw new Error('Both before and after images are required');
-  }
+// Single-photo modes are stored under a folder named after the mode;
+// BeforeAfterSlider reads the folder from the URL to pick the badge/styling.
+export type SinglePhotoMode = 'composite' | 'single' | 'beforeOnly' | 'afterOnly';
 
-  if (!projectData.title || !projectData.title.trim()) {
+const SINGLE_MODE_PATH: Record<SinglePhotoMode, string> = {
+  composite: 'composite',
+  single: 'single',
+  beforeOnly: 'before-only',
+  afterOnly: 'after-only',
+};
+
+export async function uploadProject(projectData: {
+  title: string;
+  location?: string;
+  category: Project['category'];
+} & (
+  | { mode: 'beforeAfter'; before: File; after: File }
+  | { mode: SinglePhotoMode; image: File }
+)): Promise<void> {
+  if (!projectData.title.trim()) {
     throw new Error('Project title is required');
-  }
-
-  if (!projectData.category) {
-    throw new Error('Project category is required');
   }
 
   let beforeUrl: string;
   let afterUrl: string;
 
-  // Determine storage path based on display mode for URL-based rendering
-  const storagePath =
-    projectData.displayMode === 'composite' ? 'composite'
-    : projectData.displayMode === 'afterOnly'  ? 'after-only'
-    : projectData.displayMode === 'beforeOnly' ? 'before-only'
-    : null;
-
-  const isSingleImage = projectData.beforeImage === projectData.afterImage;
-
-  if (isSingleImage) {
-    // Single image mode: upload once and use same URL for both fields
+  if (projectData.mode === 'beforeAfter') {
     try {
-      beforeUrl = await uploadImage(projectData.beforeImage, storagePath ?? 'single');
-      afterUrl = beforeUrl; // Use the same URL for both
-    } catch (error) {
-      throw new Error(`Failed to upload image: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  } else {
-    // Before/After mode: upload separately
-    try {
-      beforeUrl = await uploadImage(projectData.beforeImage, 'before');
+      beforeUrl = await uploadImage(projectData.before, 'before');
     } catch (error) {
       throw new Error(`Failed to upload before image: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-
     try {
-      afterUrl = await uploadImage(projectData.afterImage, 'after');
+      afterUrl = await uploadImage(projectData.after, 'after');
     } catch (error) {
       throw new Error(`Failed to upload after image: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  } else {
+    // Single image: upload once and store the same URL in both columns
+    try {
+      beforeUrl = afterUrl = await uploadImage(projectData.image, SINGLE_MODE_PATH[projectData.mode]);
+    } catch (error) {
+      throw new Error(`Failed to upload image: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -185,7 +161,7 @@ export async function uploadProject(projectData: Partial<Project> & { displayMod
     .from('projects')
     .insert([{
       title: projectData.title.trim(),
-      location: projectData.location || 'Not specified',
+      location: projectData.location?.trim() || 'Not specified',
       category: projectData.category,
       before_image_url: beforeUrl,
       after_image_url: afterUrl,
@@ -197,13 +173,12 @@ export async function uploadProject(projectData: Partial<Project> & { displayMod
 }
 
 export async function uploadGalleryProject(projectData: {
-  title?: string;
+  title: string;
   location?: string;
-  category?: string;
+  category: Project['category'];
   galleryFiles: File[];
 }): Promise<void> {
-  if (!projectData.title?.trim()) throw new Error('Project title is required');
-  if (!projectData.category) throw new Error('Project category is required');
+  if (!projectData.title.trim()) throw new Error('Project title is required');
   if (projectData.galleryFiles.length < 2) throw new Error('Please add at least 2 photos for a gallery');
 
   const imageUrls: string[] = [];
@@ -216,7 +191,7 @@ export async function uploadGalleryProject(projectData: {
     .from('projects')
     .insert([{
       title: projectData.title.trim(),
-      location: projectData.location || 'Not specified',
+      location: projectData.location?.trim() || 'Not specified',
       category: projectData.category,
       before_image_url: imageUrls[0],
       after_image_url: imageUrls[0],
@@ -226,15 +201,16 @@ export async function uploadGalleryProject(projectData: {
   if (error) throw new Error(`Failed to save gallery project: ${error.message}`);
 }
 
-export async function updateService(service: Service): Promise<void> {  const { error } = await supabase
+export async function updateService(service: Service): Promise<void> {
+  const { error } = await supabase
     .from('services')
-    .upsert({
-      id: service.id.includes('v-') ? undefined : service.id, // Handle potential temp IDs
+    .update({
       title: service.title,
       category: service.category,
       short_description: service.shortDescription,
-      icon_name: service.iconName
-    });
+      icon_name: service.iconName,
+    })
+    .eq('id', service.id);
   if (error) throw error;
 }
 
@@ -310,6 +286,38 @@ export async function deleteService(id: string): Promise<void> {
   if (error) throw error;
 }
 
+// --- Public lookups (job tracker / quote page) ---
+
+// Logged-out visitors go through the SECURITY DEFINER functions in
+// MIGRATION_SECURITY.sql so they can't list other clients' data. Until that
+// migration is applied the functions don't exist (PGRST202), so we fall back
+// to the old direct table queries to keep the site working.
+const isMissingFunction = (error: { code?: string } | null) => error?.code === 'PGRST202';
+
+export interface TrackedJob {
+  tracking_code: string;
+  client_name: string;
+  item_description: string;
+  status: string;
+  wip_image_url: string | null;
+  latest_note: string | null;
+}
+
+export async function trackJob(code: string): Promise<TrackedJob | null> {
+  const { data, error } = await supabase.rpc('track_job', { code });
+  if (!isMissingFunction(error)) {
+    if (error) throw error;
+    return (data as TrackedJob[])[0] ?? null;
+  }
+  const legacy = await supabase
+    .from('jobs')
+    .select('tracking_code, client_name, item_description, status, wip_image_url, latest_note')
+    .eq('tracking_code', code)
+    .maybeSingle();
+  if (legacy.error) throw legacy.error;
+  return legacy.data as TrackedJob | null;
+}
+
 // --- Quote Requests ---
 
 export interface QuoteRequest {
@@ -326,27 +334,39 @@ export interface QuoteRequest {
   created_at: string;
 }
 
+// The subset of a quote a customer sees on their quote link.
+export type QuoteView = Pick<QuoteRequest, 'quote_code' | 'client_name' | 'item_description' | 'status' | 'quoted_price' | 'admin_note'>;
+
 function generateQuoteCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   return 'QT-' + Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 }
 
+/** Saves a customer quote request and returns its quote code. */
 export async function saveQuoteRequest(data: {
   client_name: string;
   client_phone: string;
   suburb: string;
   service_category: string;
   item_description: string;
-}): Promise<QuoteRequest> {
+}): Promise<string> {
+  const { data: code, error } = await supabase.rpc('submit_quote_request', {
+    p_client_name: data.client_name,
+    p_client_phone: data.client_phone,
+    p_suburb: data.suburb,
+    p_service_category: data.service_category,
+    p_item_description: data.item_description,
+  });
+  if (!isMissingFunction(error)) {
+    if (error) throw error;
+    return code as string;
+  }
+
   // Retry a few times in the rare case of quote_code collision.
   for (let attempt = 0; attempt < 3; attempt++) {
     const quote_code = generateQuoteCode();
-    const { data: row, error } = await supabase
-      .from('quote_requests')
-      .insert({ ...data, quote_code })
-      .select()
-      .single();
-    if (!error) return row as QuoteRequest;
+    const { error } = await supabase.from('quote_requests').insert({ ...data, quote_code });
+    if (!error) return quote_code;
     if (error.code !== '23505') throw error;
   }
   throw new Error('Failed to generate a unique quote code. Please try again.');
@@ -361,14 +381,19 @@ export async function fetchQuoteRequests(): Promise<QuoteRequest[]> {
   return data as QuoteRequest[];
 }
 
-export async function getQuoteByCode(code: string): Promise<QuoteRequest | null> {
-  const { data, error } = await supabase
+export async function getQuoteByCode(code: string): Promise<QuoteView | null> {
+  const { data, error } = await supabase.rpc('get_quote', { code });
+  if (!isMissingFunction(error)) {
+    if (error) throw error;
+    return (data as QuoteView[])[0] ?? null;
+  }
+  const legacy = await supabase
     .from('quote_requests')
-    .select('*')
+    .select('quote_code, client_name, item_description, status, quoted_price, admin_note')
     .eq('quote_code', code)
     .maybeSingle();
-  if (error) throw error;
-  return data as QuoteRequest | null;
+  if (legacy.error) throw legacy.error;
+  return legacy.data as QuoteView | null;
 }
 
 export async function sendQuoteToClient(id: string, quoted_price: string, admin_note: string): Promise<void> {
@@ -387,12 +412,17 @@ export async function adminDeclineQuote(id: string): Promise<void> {
   if (error) throw error;
 }
 
-export async function respondToQuote(quote_code: string, response: 'accepted' | 'declined'): Promise<void> {
-  const { error } = await supabase
+export async function respondToQuote(code: string, response: 'accepted' | 'declined'): Promise<void> {
+  const { data, error } = await supabase.rpc('respond_to_quote', { code, response });
+  if (!isMissingFunction(error)) {
+    if (error) throw error;
+    if (!data) throw new Error('This quote can no longer be changed.');
+    return;
+  }
+  const legacy = await supabase
     .from('quote_requests')
     .update({ status: response })
-    .eq('quote_code', quote_code)
+    .eq('quote_code', code)
     .eq('status', 'quoted');
-  if (error) throw error;
+  if (legacy.error) throw legacy.error;
 }
-
