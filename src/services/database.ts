@@ -288,11 +288,13 @@ export async function deleteService(id: string): Promise<void> {
 
 // --- Public lookups (job tracker / quote page) ---
 
-// Logged-out visitors go through the SECURITY DEFINER functions in
-// MIGRATION_SECURITY.sql so they can't list other clients' data. Until that
-// migration is applied the functions don't exist (PGRST202), so we fall back
-// to the old direct table queries to keep the site working.
-const isMissingFunction = (error: { code?: string } | null) => error?.code === 'PGRST202';
+// Logged-out visitors can only read the one job or quote whose code they send
+// in this header; the RLS policies in MIGRATION_SECURITY.sql enforce it, and
+// column grants limit them to the fields below.
+const LOOKUP_HEADER = 'x-lookup-code';
+
+const PUBLIC_JOB_COLUMNS = 'tracking_code, client_name, item_description, status, wip_image_url, latest_note';
+const PUBLIC_QUOTE_COLUMNS = 'quote_code, client_name, item_description, status, quoted_price, admin_note';
 
 export interface TrackedJob {
   tracking_code: string;
@@ -304,18 +306,14 @@ export interface TrackedJob {
 }
 
 export async function trackJob(code: string): Promise<TrackedJob | null> {
-  const { data, error } = await supabase.rpc('track_job', { code });
-  if (!isMissingFunction(error)) {
-    if (error) throw error;
-    return (data as TrackedJob[])[0] ?? null;
-  }
-  const legacy = await supabase
+  const { data, error } = await supabase
     .from('jobs')
-    .select('tracking_code, client_name, item_description, status, wip_image_url, latest_note')
+    .select(PUBLIC_JOB_COLUMNS)
     .eq('tracking_code', code)
+    .setHeader(LOOKUP_HEADER, code)
     .maybeSingle();
-  if (legacy.error) throw legacy.error;
-  return legacy.data as TrackedJob | null;
+  if (error) throw error;
+  return data as TrackedJob | null;
 }
 
 // --- Quote Requests ---
@@ -350,18 +348,6 @@ export async function saveQuoteRequest(data: {
   service_category: string;
   item_description: string;
 }): Promise<string> {
-  const { data: code, error } = await supabase.rpc('submit_quote_request', {
-    p_client_name: data.client_name,
-    p_client_phone: data.client_phone,
-    p_suburb: data.suburb,
-    p_service_category: data.service_category,
-    p_item_description: data.item_description,
-  });
-  if (!isMissingFunction(error)) {
-    if (error) throw error;
-    return code as string;
-  }
-
   // Retry a few times in the rare case of quote_code collision.
   for (let attempt = 0; attempt < 3; attempt++) {
     const quote_code = generateQuoteCode();
@@ -382,18 +368,14 @@ export async function fetchQuoteRequests(): Promise<QuoteRequest[]> {
 }
 
 export async function getQuoteByCode(code: string): Promise<QuoteView | null> {
-  const { data, error } = await supabase.rpc('get_quote', { code });
-  if (!isMissingFunction(error)) {
-    if (error) throw error;
-    return (data as QuoteView[])[0] ?? null;
-  }
-  const legacy = await supabase
+  const { data, error } = await supabase
     .from('quote_requests')
-    .select('quote_code, client_name, item_description, status, quoted_price, admin_note')
+    .select(PUBLIC_QUOTE_COLUMNS)
     .eq('quote_code', code)
+    .setHeader(LOOKUP_HEADER, code)
     .maybeSingle();
-  if (legacy.error) throw legacy.error;
-  return legacy.data as QuoteView | null;
+  if (error) throw error;
+  return data as QuoteView | null;
 }
 
 export async function sendQuoteToClient(id: string, quoted_price: string, admin_note: string): Promise<void> {
@@ -413,16 +395,13 @@ export async function adminDeclineQuote(id: string): Promise<void> {
 }
 
 export async function respondToQuote(code: string, response: 'accepted' | 'declined'): Promise<void> {
-  const { data, error } = await supabase.rpc('respond_to_quote', { code, response });
-  if (!isMissingFunction(error)) {
-    if (error) throw error;
-    if (!data) throw new Error('This quote can no longer be changed.');
-    return;
-  }
-  const legacy = await supabase
+  const { data, error } = await supabase
     .from('quote_requests')
     .update({ status: response })
     .eq('quote_code', code)
-    .eq('status', 'quoted');
-  if (legacy.error) throw legacy.error;
+    .eq('status', 'quoted')
+    .setHeader(LOOKUP_HEADER, code)
+    .select('status');
+  if (error) throw error;
+  if (!data?.length) throw new Error('This quote can no longer be changed.');
 }
